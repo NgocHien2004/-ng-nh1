@@ -1,13 +1,13 @@
 <?php
 /**
- * PhoneStore Theme Functions - Products Fix
- * Version: 2.1
+ * PhoneStore Theme Functions - Complete Version
+ * Version: 3.0
  */
 
 // Enqueue styles và scripts
 function phonestore_enqueue_styles() {
-    wp_enqueue_style('phonestore-style', get_stylesheet_uri(), array(), '2.1.0');
-    wp_enqueue_script('phonestore-script', get_template_directory_uri() . '/js/phonestore.js', array('jquery'), '2.1.0', true);
+    wp_enqueue_style('phonestore-style', get_stylesheet_uri(), array(), '3.0.0');
+    wp_enqueue_script('phonestore-script', get_template_directory_uri() . '/js/phonestore.js', array('jquery'), '3.0.0', true);
     
     // Localize script cho AJAX
     wp_localize_script('phonestore-script', 'phonestore_ajax', array(
@@ -40,11 +40,85 @@ function phonestore_add_woocommerce_support() {
     add_theme_support('wc-product-gallery-zoom');
     add_theme_support('wc-product-gallery-lightbox');
     add_theme_support('wc-product-gallery-slider');
-    
-    // Force show products on shop page
-    add_theme_support('wc-product-gallery-slider');
 }
 add_action('after_setup_theme', 'phonestore_add_woocommerce_support');
+
+// Tạo các pages cần thiết khi theme được kích hoạt
+function phonestore_create_required_pages() {
+    // Tạo trang Liên Hệ
+    $contact_page = get_page_by_path('lien-he');
+    if (!$contact_page) {
+        wp_insert_post(array(
+            'post_title' => 'Liên Hệ',
+            'post_name' => 'lien-he',
+            'post_content' => '[contact_page_content]',
+            'post_status' => 'publish',
+            'post_type' => 'page',
+            'page_template' => 'page-lien-he.php'
+        ));
+    }
+    
+    // Tạo trang So Sánh Sản Phẩm
+    $compare_page = get_page_by_path('so-sanh-san-pham');
+    if (!$compare_page) {
+        wp_insert_post(array(
+            'post_title' => 'So Sánh Sản Phẩm',
+            'post_name' => 'so-sanh-san-pham',
+            'post_content' => '[compare_page_content]',
+            'post_status' => 'publish',
+            'post_type' => 'page',
+            'page_template' => 'page-so-sanh.php'
+        ));
+    }
+    
+    // Tạo menu chính nếu chưa có
+    if (!wp_get_nav_menu_object('Main Menu')) {
+        $menu_id = wp_create_nav_menu('Main Menu');
+        
+        // Thêm items vào menu
+        wp_update_nav_menu_item($menu_id, 0, array(
+            'menu-item-title' => 'Trang chủ',
+            'menu-item-url' => home_url('/'),
+            'menu-item-status' => 'publish'
+        ));
+        
+        wp_update_nav_menu_item($menu_id, 0, array(
+            'menu-item-title' => 'Sản phẩm',
+            'menu-item-url' => home_url('/shop/'),
+            'menu-item-status' => 'publish'
+        ));
+        
+        // Thêm trang Liên Hệ vào menu
+        $contact_page = get_page_by_path('lien-he');
+        if ($contact_page) {
+            wp_update_nav_menu_item($menu_id, 0, array(
+                'menu-item-title' => 'Liên hệ',
+                'menu-item-object' => 'page',
+                'menu-item-object-id' => $contact_page->ID,
+                'menu-item-type' => 'post_type',
+                'menu-item-status' => 'publish'
+            ));
+        }
+        
+        // Thêm trang So Sánh vào menu
+        $compare_page = get_page_by_path('so-sanh-san-pham');
+        if ($compare_page) {
+            wp_update_nav_menu_item($menu_id, 0, array(
+                'menu-item-title' => 'So sánh',
+                'menu-item-object' => 'page',
+                'menu-item-object-id' => $compare_page->ID,
+                'menu-item-type' => 'post_type',
+                'menu-item-status' => 'publish'
+            ));
+        }
+        
+        // Gán menu vào location
+        $locations = get_theme_mod('nav_menu_locations');
+        $locations['primary'] = $menu_id;
+        set_theme_mod('nav_menu_locations', $locations);
+    }
+}
+add_action('after_switch_theme', 'phonestore_create_required_pages');
 
 // FORCE products per page
 function phonestore_products_per_page() {
@@ -83,32 +157,6 @@ function phonestore_remove_product_visibility() {
     remove_action('pre_get_posts', 'wc_product_visibility_meta_query');
 }
 add_action('init', 'phonestore_remove_product_visibility');
-
-// Force all products to be visible
-function phonestore_make_all_products_visible() {
-    $products = get_posts(array(
-        'post_type' => 'product',
-        'post_status' => 'publish', 
-        'posts_per_page' => -1
-    ));
-    
-    foreach ($products as $product) {
-        // Update product visibility
-        update_post_meta($product->ID, '_visibility', 'visible');
-        update_post_meta($product->ID, '_stock_status', 'instock');
-        
-        // Update WooCommerce product object
-        $wc_product = wc_get_product($product->ID);
-        if ($wc_product) {
-            $wc_product->set_catalog_visibility('visible');
-            $wc_product->set_stock_status('instock');
-            $wc_product->save();
-        }
-    }
-}
-
-// Run once to fix existing products (comment out after running)
-// add_action('wp_loaded', 'phonestore_make_all_products_visible');
 
 // Add custom body class
 function phonestore_woocommerce_body_class($classes) {
@@ -187,10 +235,11 @@ function phonestore_ajax_product_search() {
     foreach ($products as $product) {
         $wc_product = wc_get_product($product->ID);
         $suggestions[] = array(
+            'id' => $product->ID,
             'title' => $product->post_title,
             'url' => get_permalink($product->ID),
             'price' => $wc_product ? $wc_product->get_price_html() : 'Liên hệ',
-            'image' => get_the_post_thumbnail_url($product->ID, 'thumbnail') ?: 'https://via.placeholder.com/150'
+            'image' => get_the_post_thumbnail_url($product->ID, 'thumbnail') ?: wc_placeholder_img_src()
         );
     }
     
@@ -199,139 +248,7 @@ function phonestore_ajax_product_search() {
 add_action('wp_ajax_phonestore_ajax_product_search', 'phonestore_ajax_product_search');
 add_action('wp_ajax_nopriv_phonestore_ajax_product_search', 'phonestore_ajax_product_search');
 
-// Add inline styles to fix any remaining issues
-function phonestore_inline_fixes() {
-    if (is_shop() || is_product_category()) {
-    ?>
-    <style>
-    /* Force show products */
-    .woocommerce .products {
-        display: grid !important;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
-        gap: 30px !important;
-    }
-    
-    /* Hide sidebar completely */
-    .woocommerce-sidebar,
-    .sidebar,
-    .widget-area,
-    .secondary {
-        display: none !important;
-    }
-    
-    /* Full width content */
-    .woocommerce,
-    .woocommerce-page,
-    .content-area,
-    .site-main {
-        width: 100% !important;
-        max-width: 1200px !important;
-        margin: 0 auto !important;
-    }
-    
-    /* Fix any float issues */
-    .woocommerce .products::after,
-    .woocommerce .products::before {
-        display: none !important;
-    }
-    
-    .woocommerce .products li.product {
-        float: none !important;
-        width: auto !important;
-        margin: 0 !important;
-    }
-    
-    /* Force product visibility */
-    .woocommerce .products li.product {
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-    }
-    </style>
-    <?php
-    }
-}
-add_action('wp_head', 'phonestore_inline_fixes', 999);
-
-// Create sample products if none exist
-function phonestore_create_sample_products() {
-    // Only run if no products exist
-    $existing_products = get_posts(array(
-        'post_type' => 'product',
-        'posts_per_page' => 1
-    ));
-    
-    if (empty($existing_products)) {
-        // Create sample products
-        $sample_products = array(
-            array(
-                'name' => 'iPhone 15 Pro',
-                'price' => '29990000',
-                'description' => 'iPhone mới nhất với chip A17 Pro',
-                'image' => 'https://via.placeholder.com/400x400/007cba/ffffff?text=iPhone+15+Pro'
-            ),
-            array(
-                'name' => 'Samsung Galaxy S24',
-                'price' => '22990000', 
-                'description' => 'Galaxy S24 với AI Galaxy',
-                'image' => 'https://via.placeholder.com/400x400/1f4788/ffffff?text=Galaxy+S24'
-            ),
-            array(
-                'name' => 'Xiaomi 14',
-                'price' => '15990000',
-                'description' => 'Xiaomi 14 với Snapdragon 8 Gen 3',
-                'image' => 'https://via.placeholder.com/400x400/ff6900/ffffff?text=Xiaomi+14'
-            )
-        );
-        
-        foreach ($sample_products as $product_data) {
-            $product = new WC_Product_Simple();
-            $product->set_name($product_data['name']);
-            $product->set_status('publish');
-            $product->set_featured(false);
-            $product->set_catalog_visibility('visible');
-            $product->set_description($product_data['description']);
-            $product->set_sku('');
-            $product->set_price($product_data['price']);
-            $product->set_regular_price($product_data['price']);
-            $product->set_stock_status('instock');
-            $product->set_manage_stock(false);
-            $product->set_sold_individually(false);
-            $product->save();
-        }
-    }
-}
-
-// Uncomment this line to create sample products
-// add_action('wp_loaded', 'phonestore_create_sample_products');
-
-// Security and performance optimizations
-remove_action('wp_head', 'wp_generator');
-remove_action('wp_head', 'print_emoji_detection_script', 7);
-remove_action('wp_print_styles', 'print_emoji_styles');
-wp_deregister_script('wp-embed');
-
-// Fix for "No products found" issue
-function phonestore_debug_shop_query() {
-    if (is_shop() && current_user_can('administrator') && isset($_GET['debug'])) {
-        global $wp_query;
-        echo '<div style="background: #fff; padding: 20px; margin: 20px 0; border-radius: 10px; border: 2px solid #4ecdc4;">';
-        echo '<h3>🔧 Debug Info (Admin Only)</h3>';
-        echo '<p><strong>Query:</strong> ' . $wp_query->request . '</p>';
-        echo '<p><strong>Found Posts:</strong> ' . $wp_query->found_posts . '</p>';
-        echo '<p><strong>Post Count:</strong> ' . $wp_query->post_count . '</p>';
-        echo '<p><strong>Is Shop:</strong> ' . (is_shop() ? 'Yes' : 'No') . '</p>';
-        echo '<p><strong>Post Type:</strong> ' . $wp_query->get('post_type') . '</p>';
-        
-        // Check direct product count
-        $direct_count = wp_count_posts('product');
-        echo '<p><strong>Direct Product Count:</strong> ' . $direct_count->publish . '</p>';
-        
-        echo '<p><em>Add ?debug=1 to URL to see this info</em></p>';
-        echo '</div>';
-    }
-}
-add_action('woocommerce_before_shop_loop', 'phonestore_debug_shop_query');
+// AJAX search for compare
 function phonestore_search_products_compare() {
     if (!wp_verify_nonce($_POST['nonce'], 'phonestore_nonce')) {
         wp_die('Security check failed');
@@ -355,7 +272,7 @@ function phonestore_search_products_compare() {
             'id' => $product->ID,
             'title' => $product->post_title,
             'price' => $wc_product ? $wc_product->get_price_html() : 'Liên hệ',
-            'image' => get_the_post_thumbnail_url($product->ID, 'thumbnail') ?: 'https://via.placeholder.com/100x100?text=No+Image'
+            'image' => get_the_post_thumbnail_url($product->ID, 'thumbnail') ?: wc_placeholder_img_src()
         );
     }
     
@@ -384,7 +301,7 @@ function phonestore_get_product_compare() {
         'id' => $product_id,
         'title' => $product->post_title,
         'price' => $wc_product ? $wc_product->get_price_html() : 'Liên hệ',
-        'image' => get_the_post_thumbnail_url($product_id, 'medium') ?: 'https://via.placeholder.com/300x300?text=No+Image'
+        'image' => get_the_post_thumbnail_url($product_id, 'medium') ?: wc_placeholder_img_src()
     );
     
     wp_send_json_success($product_data);
@@ -419,37 +336,32 @@ function phonestore_load_compare_table() {
             'id' => $product_id,
             'title' => $product->post_title,
             'price' => $wc_product ? $wc_product->get_price_html() : 'Liên hệ',
-            'image' => get_the_post_thumbnail_url($product_id, 'medium') ?: 'https://via.placeholder.com/250x250?text=No+Image',
+            'image' => get_the_post_thumbnail_url($product_id, 'medium') ?: wc_placeholder_img_src(),
             'url' => get_permalink($product_id)
         );
         
         // Get specs (using ACF or custom fields)
         $product_specs = array();
         
-        // Thông số cơ bản
         if (function_exists('get_field')) {
             $product_specs['brand'] = get_field('brand', $product_id) ?: 'Không có thông tin';
-            $product_specs['screen'] = get_field('screen', $product_id) ?: 'Không có thông tin';
+            $product_specs['display_size'] = get_field('display_size', $product_id) ?: 'Không có thông tin';
             $product_specs['cpu'] = get_field('cpu', $product_id) ?: 'Không có thông tin';
             $product_specs['ram'] = get_field('ram', $product_id) ?: 'Không có thông tin';
             $product_specs['storage'] = get_field('storage', $product_id) ?: 'Không có thông tin';
-            $product_specs['camera'] = get_field('camera', $product_id) ?: 'Không có thông tin';
+            $product_specs['rear_camera'] = get_field('rear_camera', $product_id) ?: 'Không có thông tin';
             $product_specs['battery'] = get_field('battery', $product_id) ?: 'Không có thông tin';
             $product_specs['os'] = get_field('os', $product_id) ?: 'Không có thông tin';
-            $product_specs['weight'] = get_field('weight', $product_id) ?: 'Không có thông tin';
-            $product_specs['dimensions'] = get_field('dimensions', $product_id) ?: 'Không có thông tin';
         } else {
             // Fallback to post meta
             $product_specs['brand'] = get_post_meta($product_id, 'brand', true) ?: 'Không có thông tin';
-            $product_specs['screen'] = get_post_meta($product_id, 'screen', true) ?: 'Không có thông tin';
+            $product_specs['display_size'] = get_post_meta($product_id, 'display_size', true) ?: 'Không có thông tin';
             $product_specs['cpu'] = get_post_meta($product_id, 'cpu', true) ?: 'Không có thông tin';
             $product_specs['ram'] = get_post_meta($product_id, 'ram', true) ?: 'Không có thông tin';
             $product_specs['storage'] = get_post_meta($product_id, 'storage', true) ?: 'Không có thông tin';
-            $product_specs['camera'] = get_post_meta($product_id, 'camera', true) ?: 'Không có thông tin';
+            $product_specs['rear_camera'] = get_post_meta($product_id, 'rear_camera', true) ?: 'Không có thông tin';
             $product_specs['battery'] = get_post_meta($product_id, 'battery', true) ?: 'Không có thông tin';
             $product_specs['os'] = get_post_meta($product_id, 'os', true) ?: 'Không có thông tin';
-            $product_specs['weight'] = get_post_meta($product_id, 'weight', true) ?: 'Không có thông tin';
-            $product_specs['dimensions'] = get_post_meta($product_id, 'dimensions', true) ?: 'Không có thông tin';
         }
         
         $specs[$product_id] = $product_specs;
@@ -474,15 +386,13 @@ function phonestore_load_compare_table() {
     // Spec rows
     $spec_labels = array(
         'brand' => '📱 Thương hiệu',
-        'screen' => '📺 Màn hình',
+        'display_size' => '📺 Màn hình',
         'cpu' => '⚡ Vi xử lý',
         'ram' => '💾 RAM',
         'storage' => '💿 Bộ nhớ',
-        'camera' => '📷 Camera',
+        'rear_camera' => '📷 Camera',
         'battery' => '🔋 Pin',
-        'os' => '🖥️ Hệ điều hành',
-        'weight' => '⚖️ Trọng lượng',
-        'dimensions' => '📏 Kích thước'
+        'os' => '🖥️ Hệ điều hành'
     );
     
     foreach ($spec_labels as $spec_key => $spec_label) {
@@ -504,6 +414,7 @@ function phonestore_load_compare_table() {
 add_action('wp_ajax_phonestore_load_compare_table', 'phonestore_load_compare_table');
 add_action('wp_ajax_nopriv_phonestore_load_compare_table', 'phonestore_load_compare_table');
 
+// Contact form handler
 function phonestore_contact_form() {
     // Verify nonce
     if (!wp_verify_nonce($_POST['nonce'], 'phonestore_nonce')) {
@@ -528,8 +439,6 @@ function phonestore_contact_form() {
     
     if (empty($phone)) {
         $errors[] = 'Vui lòng nhập số điện thoại';
-    } elseif (!preg_match('/^[0-9\.\-\+\(\)\s]+$/', $phone)) {
-        $errors[] = 'Số điện thoại không hợp lệ';
     }
     
     if (empty($email)) {
@@ -551,20 +460,7 @@ function phonestore_contact_form() {
         return;
     }
     
-    // Subject mapping
-    $subject_labels = array(
-        'product-inquiry' => 'Hỏi về sản phẩm',
-        'warranty' => 'Bảo hành',
-        'return-exchange' => 'Đổi trả',
-        'technical-support' => 'Hỗ trợ kỹ thuật',
-        'complaint' => 'Khiếu nại',
-        'partnership' => 'Hợp tác kinh doanh',
-        'other' => 'Khác'
-    );
-    
-    $subject_text = !empty($subject) ? $subject_labels[$subject] : 'Liên hệ từ website';
-    
-    // Store in database (custom table or post meta)
+    // Store in database
     $contact_data = array(
         'post_title' => 'Liên hệ từ ' . $name . ' - ' . date('d/m/Y H:i'),
         'post_content' => $message,
@@ -574,9 +470,8 @@ function phonestore_contact_form() {
             'contact_name' => $name,
             'contact_phone' => $phone,
             'contact_email' => $email,
-            'contact_subject' => $subject_text,
+            'contact_subject' => $subject,
             'contact_ip' => $_SERVER['REMOTE_ADDR'],
-            'contact_user_agent' => $_SERVER['HTTP_USER_AGENT'],
             'contact_date' => current_time('mysql')
         )
     );
@@ -588,120 +483,14 @@ function phonestore_contact_form() {
         return;
     }
     
-    // Send email notification to admin
+    // Send email notification
     $admin_email = get_option('admin_email');
     $site_name = get_bloginfo('name');
     
     $email_subject = '[' . $site_name . '] Liên hệ mới từ ' . $name;
+    $email_message = "Tên: $name\nĐiện thoại: $phone\nEmail: $email\nChủ đề: $subject\n\nTin nhắn:\n$message";
     
-    $email_message = "
-    <html>
-    <head>
-        <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .header { background: #1a365d; color: white; padding: 20px; text-align: center; }
-            .content { padding: 20px; background: #f8f9fa; }
-            .info-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            .info-table th, .info-table td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-            .info-table th { background: #e2e8f0; font-weight: bold; }
-            .message-box { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #38a169; }
-            .footer { background: #2d3748; color: white; padding: 15px; text-align: center; font-size: 12px; }
-        </style>
-    </head>
-    <body>
-        <div class='header'>
-            <h2>📞 Liên Hệ Mới Từ Website</h2>
-        </div>
-        
-        <div class='content'>
-            <h3>Thông tin khách hàng:</h3>
-            <table class='info-table'>
-                <tr><th>👤 Họ và tên:</th><td>{$name}</td></tr>
-                <tr><th>📱 Số điện thoại:</th><td>{$phone}</td></tr>
-                <tr><th>✉️ Email:</th><td>{$email}</td></tr>
-                <tr><th>📋 Chủ đề:</th><td>{$subject_text}</td></tr>
-                <tr><th>🕐 Thời gian:</th><td>" . current_time('d/m/Y H:i:s') . "</td></tr>
-            </table>
-            
-            <div class='message-box'>
-                <h4>💭 Tin nhắn:</h4>
-                <p>" . nl2br($message) . "</p>
-            </div>
-        </div>
-        
-        <div class='footer'>
-            <p>Email này được gửi tự động từ website {$site_name}</p>
-        </div>
-    </body>
-    </html>
-    ";
-    
-    $headers = array(
-        'Content-Type: text/html; charset=UTF-8',
-        'From: ' . $site_name . ' <noreply@' . $_SERVER['HTTP_HOST'] . '>',
-        'Reply-To: ' . $name . ' <' . $email . '>'
-    );
-    
-    wp_mail($admin_email, $email_subject, $email_message, $headers);
-    
-    // Send auto-reply to customer
-    $customer_subject = 'Cảm ơn bạn đã liên hệ với ' . $site_name;
-    $customer_message = "
-    <html>
-    <head>
-        <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .header { background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%); color: white; padding: 30px; text-align: center; }
-            .content { padding: 30px; background: #f8f9fa; }
-            .info-box { background: white; padding: 20px; border-radius: 12px; margin: 20px 0; border: 2px solid #e2e8f0; }
-            .contact-info { background: #38a169; color: white; padding: 20px; border-radius: 12px; margin: 20px 0; }
-            .footer { background: #2d3748; color: white; padding: 20px; text-align: center; }
-        </style>
-    </head>
-    <body>
-        <div class='header'>
-            <h2>📱 Cảm ơn bạn đã liên hệ!</h2>
-        </div>
-        
-        <div class='content'>
-            <p>Chào <strong>{$name}</strong>,</p>
-            
-            <div class='info-box'>
-                <p>Cảm ơn bạn đã liên hệ với <strong>Cửa Hàng Điện Thoại</strong>. Chúng tôi đã nhận được tin nhắn của bạn và sẽ phản hồi trong thời gian sớm nhất.</p>
-                
-                <h4>📋 Thông tin bạn đã gửi:</h4>
-                <ul>
-                    <li><strong>Chủ đề:</strong> {$subject_text}</li>
-                    <li><strong>Thời gian:</strong> " . current_time('d/m/Y H:i:s') . "</li>
-                </ul>
-            </div>
-            
-            <div class='contact-info'>
-                <h4>📞 Thông tin liên hệ trực tiếp:</h4>
-                <ul>
-                    <li><strong>📍 Địa chỉ:</strong> Purple House, Ninh Kiều, Cần Thơ</li>
-                    <li><strong>📱 Hotline:</strong> 0123.456.789</li>
-                    <li><strong>✉️ Email:</strong> info@phonestore.com</li>
-                    <li><strong>🕐 Giờ mở cửa:</strong> 8:00 - 21:00 (T2-T6), 8:00 - 22:00 (T7-CN)</li>
-                </ul>
-            </div>
-            
-            <p>Nếu có vấn đề gấp, bạn có thể liên hệ trực tiếp qua hotline hoặc đến cửa hàng.</p>
-        </div>
-        
-        <div class='footer'>
-            <p>Trân trọng,<br><strong>Đội ngũ Cửa Hàng Điện Thoại</strong></p>
-        </div>
-    </body>
-    </html>
-    ";
-    
-    $customer_headers = array(
-        'Content-Type: text/html; charset=UTF-8',
-        'From: ' . $site_name . ' <noreply@' . $_SERVER['HTTP_HOST'] . '>'
-    );
-    
-    wp_mail($email, $customer_subject, $customer_message, $customer_headers);
+    wp_mail($admin_email, $email_subject, $email_message);
     
     // Success response
     wp_send_json_success(array(
@@ -722,768 +511,1083 @@ function phonestore_register_contact_post_type() {
         'menu_icon' => 'dashicons-email-alt',
         'capability_type' => 'post',
         'hierarchical' => false,
-        'supports' => array('title', 'editor'),
-        'labels' => array(
-            'name' => 'Liên Hệ',
-            'singular_name' => 'Liên Hệ',
-            'menu_name' => 'Liên Hệ',
-            'add_new' => 'Thêm Mới',
-            'add_new_item' => 'Thêm Liên Hệ Mới',
-            'edit_item' => 'Sửa Liên Hệ',
-            'new_item' => 'Liên Hệ Mới',
-            'view_item' => 'Xem Liên Hệ',
-            'search_items' => 'Tìm Liên Hệ',
-            'not_found' => 'Không tìm thấy',
-            'not_found_in_trash' => 'Không có trong thùng rác'
-        )
+        'supports' => array('title', 'editor')
     );
     register_post_type('contact', $args);
 }
 add_action('init', 'phonestore_register_contact_post_type');
 
-// Add custom columns to contact list
-function phonestore_contact_columns($columns) {
-    $new_columns = array();
-    $new_columns['cb'] = $columns['cb'];
-    $new_columns['title'] = 'Tiêu đề';
-    $new_columns['contact_name'] = 'Tên';
-    $new_columns['contact_email'] = 'Email';
-    $new_columns['contact_phone'] = 'Điện thoại';
-    $new_columns['contact_subject'] = 'Chủ đề';
-    $new_columns['date'] = 'Ngày gửi';
-    return $new_columns;
+// Custom navigation walker to check if page exists
+function phonestore_get_nav_menu_item_url($item_url, $item, $args, $depth) {
+    // Check if this is our custom pages
+    if (strpos($item_url, 'lien-he') !== false) {
+        $page = get_page_by_path('lien-he');
+        if ($page) {
+            return get_permalink($page->ID);
+        }
+    }
+    
+    if (strpos($item_url, 'so-sanh-san-pham') !== false) {
+        $page = get_page_by_path('so-sanh-san-pham');
+        if ($page) {
+            return get_permalink($page->ID);
+        }
+    }
+    
+    return $item_url;
 }
-add_filter('manage_contact_posts_columns', 'phonestore_contact_columns');
+add_filter('nav_menu_link_attributes', 'phonestore_get_nav_menu_item_url', 10, 4);
 
-// Populate custom columns
-function phonestore_contact_column_content($column, $post_id) {
-    switch ($column) {
-        case 'contact_name':
-            echo get_post_meta($post_id, 'contact_name', true);
-            break;
-        case 'contact_email':
-            $email = get_post_meta($post_id, 'contact_email', true);
-            echo '<a href="mailto:' . $email . '">' . $email . '</a>';
-            break;
-        case 'contact_phone':
-            $phone = get_post_meta($post_id, 'contact_phone', true);
-            echo '<a href="tel:' . $phone . '">' . $phone . '</a>';
-            break;
-        case 'contact_subject':
-            echo get_post_meta($post_id, 'contact_subject', true);
-            break;
+// Add inline styles to fix any remaining issues
+function phonestore_inline_fixes() {
+    if (is_shop() || is_product_category()) {
+        ?>
+        <style>
+        /* Force show products */
+        .woocommerce .products {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+            gap: 30px !important;
+        }
+        
+        /* Hide sidebar completely */
+        .woocommerce-sidebar,
+        .sidebar,
+        .widget-area,
+        .secondary {
+            display: none !important;
+        }
+        
+        /* Full width content */
+        .woocommerce,
+        .woocommerce-page,
+        .content-area,
+        .site-main {
+            width: 100% !important;
+            max-width: 1200px !important;
+            margin: 0 auto !important;
+        }
+        
+        /* Fix any float issues */
+        .woocommerce .products::after,
+        .woocommerce .products::before {
+            display: none !important;
+        }
+        
+        .woocommerce .products li.product {
+            float: none !important;
+            width: auto !important;
+            margin: 0 !important;
+        }
+        
+        /* Force product visibility */
+        .woocommerce .products li.product {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+        </style>
+        <?php
     }
 }
-add_action('manage_contact_posts_custom_column', 'phonestore_contact_column_content', 10, 2);
+add_action('wp_head', 'phonestore_inline_fixes', 999);
 
-// Make columns sortable
-function phonestore_contact_sortable_columns($columns) {
-    $columns['contact_name'] = 'contact_name';
-    $columns['contact_email'] = 'contact_email';
-    $columns['contact_subject'] = 'contact_subject';
-    return $columns;
-}
-add_filter('manage_edit-contact_sortable_columns', 'phonestore_contact_sortable_columns');
+// Security and performance optimizations
+remove_action('wp_head', 'wp_generator');
+remove_action('wp_head', 'print_emoji_detection_script', 7);
+remove_action('wp_print_styles', 'print_emoji_styles');
+wp_deregister_script('wp-embed');
 
-// Add meta boxes for contact details
-function phonestore_contact_meta_boxes() {
-    add_meta_box(
-        'contact-details',
-        'Chi Tiết Liên Hệ',
-        'phonestore_contact_details_callback',
-        'contact',
-        'normal',
-        'high'
-    );
-}
-add_action('add_meta_boxes', 'phonestore_contact_meta_boxes');
-
-// Contact details meta box callback
-function phonestore_contact_details_callback($post) {
-    $name = get_post_meta($post->ID, 'contact_name', true);
-    $phone = get_post_meta($post->ID, 'contact_phone', true);
-    $email = get_post_meta($post->ID, 'contact_email', true);
-    $subject = get_post_meta($post->ID, 'contact_subject', true);
-    $ip = get_post_meta($post->ID, 'contact_ip', true);
-    $user_agent = get_post_meta($post->ID, 'contact_user_agent', true);
-    $contact_date = get_post_meta($post->ID, 'contact_date', true);
-    
-    echo '<table class="form-table">';
-    echo '<tr><th><strong>👤 Họ và tên:</strong></th><td>' . esc_html($name) . '</td></tr>';
-    echo '<tr><th><strong>📱 Số điện thoại:</strong></th><td><a href="tel:' . esc_attr($phone) . '">' . esc_html($phone) . '</a></td></tr>';
-    echo '<tr><th><strong>✉️ Email:</strong></th><td><a href="mailto:' . esc_attr($email) . '">' . esc_html($email) . '</a></td></tr>';
-    echo '<tr><th><strong>📋 Chủ đề:</strong></th><td>' . esc_html($subject) . '</td></tr>';
-    echo '<tr><th><strong>🕐 Thời gian gửi:</strong></th><td>' . esc_html($contact_date) . '</td></tr>';
-    echo '<tr><th><strong>🌐 IP Address:</strong></th><td>' . esc_html($ip) . '</td></tr>';
-    echo '<tr><th><strong>🖥️ User Agent:</strong></th><td><small>' . esc_html($user_agent) . '</small></td></tr>';
-    echo '</table>';
-    
-    echo '<h3>💭 Tin nhắn:</h3>';
-    echo '<div style="background: #f9f9f9; padding: 15px; border-radius: 5px; border-left: 4px solid #0073aa;">';
-    echo wpautop(esc_html($post->post_content));
-    echo '</div>';
-    
-    echo '<h3>📧 Hành động:</h3>';
-    echo '<p>';
-    echo '<a href="mailto:' . esc_attr($email) . '?subject=Re: ' . esc_attr($subject) . '" class="button button-primary">Trả lời Email</a> ';
-    echo '<a href="tel:' . esc_attr($phone) . '" class="button">Gọi điện</a>';
-    echo '</p>';
-}
-
-// Disable editing of contact posts
-function phonestore_contact_readonly($post) {
-    if ($post->post_type == 'contact') {
-        echo '<style>#edit-slug-box, #minor-publishing-actions, #misc-publishing-actions { display: none; }</style>';
-        echo '<script>jQuery(document).ready(function($){ $("#post").find("input, textarea, select").not("#contact-reply").attr("readonly", true).attr("disabled", true); });</script>';
-    }
-}
-add_action('edit_form_after_title', 'phonestore_contact_readonly');
-
-// Add notification count to admin menu
-function phonestore_contact_menu_count() {
-    global $menu;
-    
-    $count = wp_count_posts('contact');
-    $unread_count = $count->private;
-    
-    if ($unread_count > 0) {
-        foreach ($menu as $key => $val) {
-            if ($val[2] == 'edit.php?post_type=contact') {
-                $menu[$key][0] .= ' <span class="awaiting-mod count-' . $unread_count . '"><span class="pending-count">' . $unread_count . '</span></span>';
-                break;
-            }
+// Check WooCommerce installation
+function phonestore_check_woocommerce() {
+    if (is_admin() && current_user_can('administrator')) {
+        if (!class_exists('WooCommerce')) {
+            echo '<div class="notice notice-warning"><p><strong>PhoneStore Theme:</strong> Vui lòng cài đặt và kích hoạt WooCommerce plugin để theme hoạt động đầy đủ.</p></div>';
         }
     }
 }
-add_action('admin_menu', 'phonestore_contact_menu_count');
-function create_phone_specs_fields() {
-    if (function_exists('acf_add_local_field_group')) {
-        acf_add_local_field_group(array(
-            'key' => 'group_phone_specs',
-            'title' => 'Thông số kỹ thuật điện thoại',
-            'fields' => array(
-                array(
-                    'key' => 'field_brand',
-                    'label' => 'Thương hiệu',
-                    'name' => 'brand',
-                    'type' => 'select',
-                    'choices' => array(
-                        'iphone' => 'iPhone',
-                        'samsung' => 'Samsung',
-                        'xiaomi' => 'Xiaomi',
-                        'oppo' => 'OPPO',
-                        'vivo' => 'Vivo',
-                        'huawei' => 'Huawei',
-                        'realme' => 'Realme'
-                    ),
-                ),
-                array(
-                    'key' => 'field_display_size',
-                    'label' => 'Kích thước màn hình',
-                    'name' => 'display_size',
-                    'type' => 'text',
-                    'placeholder' => 'VD: 6.1 inch'
-                ),
-                array(
-                    'key' => 'field_display_resolution',
-                    'label' => 'Độ phân giải',
-                    'name' => 'display_resolution',
-                    'type' => 'text',
-                    'placeholder' => 'VD: 1170 x 2532 pixels'
-                ),
-                array(
-                    'key' => 'field_display_type',
-                    'label' => 'Loại màn hình',
-                    'name' => 'display_type',
-                    'type' => 'text',
-                    'placeholder' => 'VD: Super Retina XDR OLED'
-                ),
-                array(
-                    'key' => 'field_cpu',
-                    'label' => 'Vi xử lý',
-                    'name' => 'cpu',
-                    'type' => 'text',
-                    'placeholder' => 'VD: Apple A15 Bionic'
-                ),
-                array(
-                    'key' => 'field_ram',
-                    'label' => 'RAM',
-                    'name' => 'ram',
-                    'type' => 'select',
-                    'choices' => array(
-                        '3gb' => '3GB',
-                        '4gb' => '4GB',
-                        '6gb' => '6GB',
-                        '8gb' => '8GB',
-                        '12gb' => '12GB',
-                        '16gb' => '16GB'
-                    ),
-                ),
-                array(
-                    'key' => 'field_storage',
-                    'label' => 'Bộ nhớ trong',
-                    'name' => 'storage',
-                    'type' => 'select',
-                    'choices' => array(
-                        '64gb' => '64GB',
-                        '128gb' => '128GB',
-                        '256gb' => '256GB',
-                        '512gb' => '512GB',
-                        '1tb' => '1TB'
-                    ),
-                ),
-                array(
-                    'key' => 'field_rear_camera',
-                    'label' => 'Camera sau',
-                    'name' => 'rear_camera',
-                    'type' => 'text',
-                    'placeholder' => 'VD: 12MP + 12MP + 12MP'
-                ),
-                array(
-                    'key' => 'field_front_camera',
-                    'label' => 'Camera trước',
-                    'name' => 'front_camera',
-                    'type' => 'text',
-                    'placeholder' => 'VD: 12MP TrueDepth'
-                ),
-                array(
-                    'key' => 'field_battery',
-                    'label' => 'Pin',
-                    'name' => 'battery',
-                    'type' => 'text',
-                    'placeholder' => 'VD: 3095 mAh'
-                ),
-                array(
-                    'key' => 'field_os',
-                    'label' => 'Hệ điều hành',
-                    'name' => 'os',
-                    'type' => 'text',
-                    'placeholder' => 'VD: iOS 15'
-                ),
-                array(
-                    'key' => 'field_dimensions',
-                    'label' => 'Kích thước',
-                    'name' => 'dimensions',
-                    'type' => 'text',
-                    'placeholder' => 'VD: 146.7 x 71.5 x 7.65 mm'
-                ),
-                array(
-                    'key' => 'field_weight',
-                    'label' => 'Trọng lượng',
-                    'name' => 'weight',
-                    'type' => 'text',
-                    'placeholder' => 'VD: 173g'
-                ),
-                array(
-                    'key' => 'field_colors',
-                    'label' => 'Màu sắc',
-                    'name' => 'colors',
-                    'type' => 'text',
-                    'placeholder' => 'VD: Xanh, Hồng, Xám, Đen'
-                ),
-                array(
-                    'key' => 'field_sim',
-                    'label' => 'Loại SIM',
-                    'name' => 'sim',
-                    'type' => 'text',
-                    'placeholder' => 'VD: Nano-SIM và eSIM'
-                ),
-                array(
-                    'key' => 'field_network',
-                    'label' => 'Mạng hỗ trợ',
-                    'name' => 'network',
-                    'type' => 'text',
-                    'placeholder' => 'VD: 5G, 4G LTE, 3G, 2G'
+add_action('admin_notices', 'phonestore_check_woocommerce');
+
+// Create sample products function (run once)
+function phonestore_create_sample_products() {
+    // Only run if no products exist
+    $existing_products = get_posts(array(
+        'post_type' => 'product',
+        'posts_per_page' => 1
+    ));
+    
+    if (empty($existing_products) && class_exists('WC_Product_Simple')) {
+        // Create sample products
+        $sample_products = array(
+            array(
+                'name' => 'iPhone 15 Pro',
+                'price' => '29990000',
+                'description' => 'iPhone mới nhất với chip A17 Pro',
+                'specs' => array(
+                    'brand' => 'iphone',
+                    'display_size' => '6.1 inch',
+                    'cpu' => 'Apple A17 Pro',
+                    'ram' => '8gb',
+                    'storage' => '256gb',
+                    'rear_camera' => '48MP + 12MP + 12MP',
+                    'battery' => '3274 mAh',
+                    'os' => 'iOS 17'
                 )
             ),
-            'location' => array(
-                array(
-                    array(
-                        'param' => 'post_type',
-                        'operator' => '==',
-                        'value' => 'product',
-                    ),
-                ),
+            array(
+                'name' => 'Samsung Galaxy S24',
+                'price' => '22990000', 
+                'description' => 'Galaxy S24 với AI Galaxy',
+                'specs' => array(
+                    'brand' => 'samsung',
+                    'display_size' => '6.2 inch',
+                    'cpu' => 'Snapdragon 8 Gen 3',
+                    'ram' => '8gb',
+                    'storage' => '256gb',
+                    'rear_camera' => '50MP + 12MP + 10MP',
+                    'battery' => '4000 mAh',
+                    'os' => 'Android 14'
+                )
             ),
+            array(
+               'name' => 'Xiaomi 14',
+               'price' => '15990000',
+               'description' => 'Xiaomi 14 với Snapdragon 8 Gen 3',
+               'specs' => array(
+                   'brand' => 'xiaomi',
+                   'display_size' => '6.36 inch',
+                   'cpu' => 'Snapdragon 8 Gen 3',
+                   'ram' => '12gb',
+                   'storage' => '256gb',
+                   'rear_camera' => '50MP + 50MP + 50MP',
+                   'battery' => '4610 mAh',
+                   'os' => 'Android 14'
+               )
+           )
+       );
+       
+       foreach ($sample_products as $product_data) {
+           $product = new WC_Product_Simple();
+           $product->set_name($product_data['name']);
+           $product->set_status('publish');
+           $product->set_featured(false);
+           $product->set_catalog_visibility('visible');
+           $product->set_description($product_data['description']);
+           $product->set_price($product_data['price']);
+           $product->set_regular_price($product_data['price']);
+           $product->set_stock_status('instock');
+           $product->set_manage_stock(false);
+           $product->set_sold_individually(false);
+           $product->save();
+           
+           // Add specs as meta data
+           foreach ($product_data['specs'] as $key => $value) {
+               update_post_meta($product->get_id(), $key, $value);
+           }
+       }
+   }
+}
+
+// Enqueue WooCommerce cart scripts
+function phonestore_enqueue_cart_scripts() {
+    if (is_cart()) {
+        // Enqueue WooCommerce cart scripts
+        wp_enqueue_script('wc-cart');
+        wp_enqueue_script('woocommerce');
+        
+        // Add cart update parameters
+        wp_localize_script('phonestore-script', 'wc_cart_params', array(
+            'wc_ajax_url' => WC_AJAX::get_endpoint('%%endpoint%%'),
+            'update_cart_nonce' => wp_create_nonce('update-cart'),
+            'apply_coupon_nonce' => wp_create_nonce('apply-coupon'),
+            'remove_coupon_nonce' => wp_create_nonce('remove-coupon')
         ));
     }
 }
-add_action('acf/init', 'create_phone_specs_fields');
-// Thêm vào functions.php
-function display_phone_specifications() {
-    global $product;
-    
-    $specs = array(
-        'brand' => 'Thương hiệu',
-        'display_size' => 'Kích thước màn hình',
-        'display_resolution' => 'Độ phân giải',
-        'display_type' => 'Loại màn hình',
-        'cpu' => 'Vi xử lý',
-        'ram' => 'RAM',
-        'storage' => 'Bộ nhớ trong',
-        'rear_camera' => 'Camera sau',
-        'front_camera' => 'Camera trước',
-        'battery' => 'Pin',
-        'os' => 'Hệ điều hành',
-        'dimensions' => 'Kích thước',
-        'weight' => 'Trọng lượng',
-        'colors' => 'Màu sắc',
-        'sim' => 'Loại SIM',
-        'network' => 'Mạng hỗ trợ'
-    );
-    
-    echo '<div class="phone-specifications">';
-    echo '<h3>Thông số kỹ thuật</h3>';
-    echo '<table class="product-specs-table">';
-    
-    foreach ($specs as $field => $label) {
-        $value = get_field($field, $product->get_id());
-        if ($value) {
-            echo '<tr>';
-            echo '<th>' . $label . '</th>';
-            echo '<td>' . $value . '</td>';
-            echo '</tr>';
-        }
-    }
-    
-    echo '</table>';
-    echo '</div>';
-}
-add_action('woocommerce_single_product_summary', 'display_phone_specifications', 25);
+add_action('wp_enqueue_scripts', 'phonestore_enqueue_cart_scripts');
 
-// Thêm vào functions.php
-function phone_search_autocomplete() {
-    // Kiểm tra nonce
-    if (!wp_verify_nonce($_POST['nonce'], 'phonestore_nonce')) {
+// Handle AJAX cart updates
+function phonestore_ajax_update_cart() {
+    if (!wp_verify_nonce($_POST['woocommerce-cart-nonce'], 'woocommerce-cart')) {
         wp_die('Security check failed');
     }
     
-    $search_term = sanitize_text_field($_POST['term']);
+    $cart_updated = false;
+    $cart = WC()->cart->get_cart();
     
-    $args = array(
-        'post_type' => 'product',
-        'post_status' => 'publish',
-        's' => $search_term,
-        'posts_per_page' => 5,
-        'meta_query' => array(
-            array(
-                'key' => '_stock_status',
-                'value' => 'instock'
-            )
-        )
-    );
-    
-    $products = get_posts($args);
-    $suggestions = array();
-    
-    foreach ($products as $product) {
-        $wc_product = wc_get_product($product->ID);
-        $suggestions[] = array(
-            'title' => $product->post_title,
-            'url' => get_permalink($product->ID),
-            'price' => $wc_product->get_price_html(),
-            'image' => get_the_post_thumbnail_url($product->ID, 'thumbnail')
-        );
-    }
-    
-    wp_send_json_success($suggestions);
-}
-add_action('wp_ajax_phone_search_autocomplete', 'phone_search_autocomplete');
-add_action('wp_ajax_nopriv_phone_search_autocomplete', 'phone_search_autocomplete');
-
-// Thêm vào functions.php
-function filter_products() {
-    if (!wp_verify_nonce($_POST['nonce'], 'phonestore_nonce')) {
-        wp_die('Security check failed');
-    }
-    
-    parse_str($_POST['filters'], $filters);
-    
-    $args = array(
-        'post_type' => 'product',
-        'post_status' => 'publish',
-        'posts_per_page' => 12,
-        'meta_query' => array('relation' => 'AND')
-    );
-    
-    // Filter theo thương hiệu
-    if (!empty($filters['filter_brand'])) {
-        $args['meta_query'][] = array(
-            'key' => 'brand',
-            'value' => $filters['filter_brand'],
-            'compare' => '='
-        );
-    }
-    
-    // Filter theo RAM
-    if (!empty($filters['filter_ram'])) {
-        $args['meta_query'][] = array(
-            'key' => 'ram',
-            'value' => $filters['filter_ram'],
-            'compare' => '='
-        );
-    }
-    
-    // Filter theo Storage
-    if (!empty($filters['filter_storage'])) {
-        $args['meta_query'][] = array(
-            'key' => 'storage',
-            'value' => $filters['filter_storage'],
-            'compare' => '='
-        );
-    }
-    
-    // Filter theo giá
-    if (!empty($filters['filter_price'])) {
-        $price_range = explode('-', $filters['filter_price']);
-        $min_price = $price_range[0] * 1000000; // Convert to VND
-        $max_price = $price_range[1] * 1000000;
-        
-        $args['meta_query'][] = array(
-            'key' => '_price',
-            'value' => array($min_price, $max_price),
-            'type' => 'NUMERIC',
-            'compare' => 'BETWEEN'
-        );
-    }
-    
-    $products = get_posts($args);
-    $html = '';
-    
-    if ($products) {
-        $html .= '<div class="products columns-4">';
-        foreach ($products as $product) {
-            $wc_product = wc_get_product($product->ID);
-            $html .= '<div class="product">';
-            $html .= '<a href="' . get_permalink($product->ID) . '">';
-            $html .= get_the_post_thumbnail($product->ID, 'woocommerce_thumbnail');
-            $html .= '<h3>' . $product->post_title . '</h3>';
-            $html .= '<span class="price">' . $wc_product->get_price_html() . '</span>';
-            
-            // Hiển thị specs ngắn gọn
-            $ram = get_field('ram', $product->ID);
-            $storage = get_field('storage', $product->ID);
-            if ($ram || $storage) {
-                $html .= '<div class="quick-specs">';
-                if ($ram) $html .= '<span>RAM: ' . strtoupper($ram) . '</span>';
-                if ($storage) $html .= '<span>Bộ nhớ: ' . strtoupper($storage) . '</span>';
-                $html .= '</div>';
+    if (isset($_POST['cart']) && is_array($_POST['cart'])) {
+        foreach ($_POST['cart'] as $cart_item_key => $values) {
+            if (isset($cart[$cart_item_key])) {
+                $quantity = (int) $values['qty'];
+                if ($quantity <= 0) {
+                    WC()->cart->remove_cart_item($cart_item_key);
+                } else {
+                    WC()->cart->set_quantity($cart_item_key, $quantity);
+                }
+                $cart_updated = true;
             }
-            
-            $html .= '</a>';
-            $html .= '<a href="?add-to-cart=' . $product->ID . '" class="button add_to_cart_button">Thêm vào giỏ</a>';
-            $html .= '</div>';
         }
-        $html .= '</div>';
-    } else {
-        $html = '<p>Không tìm thấy sản phẩm phù hợp.</p>';
     }
     
-    wp_send_json_success($html);
+    if ($cart_updated) {
+        WC()->cart->calculate_totals();
+        wc_add_notice('Giỏ hàng đã được cập nhật.', 'success');
+    }
+    
+    wp_send_json_success(array(
+        'fragments' => apply_filters('woocommerce_add_to_cart_fragments', array()),
+        'cart_hash' => WC()->cart->get_cart_hash()
+    ));
 }
-add_action('wp_ajax_filter_products', 'filter_products');
-add_action('wp_ajax_nopriv_filter_products', 'filter_products');
+add_action('wp_ajax_phonestore_update_cart', 'phonestore_ajax_update_cart');
+add_action('wp_ajax_nopriv_phonestore_update_cart', 'phonestore_ajax_update_cart');
 
-// Thêm vào functions.php
-function search_products_for_compare() {
-    if (!wp_verify_nonce($_POST['nonce'], 'phonestore_nonce')) {
-        wp_die('Security check failed');
+// Improve cart notices
+function phonestore_improve_cart_notices($message, $notice_type) {
+    if (is_cart()) {
+        $icons = array(
+            'success' => '✅',
+            'error' => '❌',
+            'notice' => 'ℹ️'
+        );
+        
+        $icon = isset($icons[$notice_type]) ? $icons[$notice_type] . ' ' : '';
+        return $icon . $message;
+    }
+    return $message;
+}
+add_filter('woocommerce_add_success_notice', 'phonestore_improve_cart_notices', 10, 2);
+add_filter('woocommerce_add_error_notice', 'phonestore_improve_cart_notices', 10, 2);
+add_filter('woocommerce_add_notice', 'phonestore_improve_cart_notices', 10, 2);
+
+// Add cart update button state management
+function phonestore_cart_update_script() {
+    if (is_cart()) {
+        ?>
+        <script>
+        jQuery(document).ready(function($) {
+            // Monitor form changes
+            let formChanged = false;
+            
+            $('.woocommerce-cart-form').on('change', 'input', function() {
+                formChanged = true;
+                $('.update-cart').prop('disabled', false);
+            });
+            
+            // Reset after successful update
+            $('.woocommerce-cart-form').on('submit', function() {
+                formChanged = false;
+            });
+            
+            // Warning when leaving page with unsaved changes
+            $(window).on('beforeunload', function() {
+                if (formChanged) {
+                    return 'Bạn có thay đổi chưa được lưu. Bạn có chắc muốn rời khỏi trang?';
+                }
+            });
+        });
+        </script>
+        <?php
+    }
+}
+
+add_action('wp_footer', 'phonestore_cart_update_script');
+
+// Add custom cart validation
+function phonestore_validate_cart_quantities($passed, $product_id, $quantity) {
+    $product = wc_get_product($product_id);
+    
+    if (!$product) {
+        return false;
     }
     
-    $search_term = sanitize_text_field($_POST['term']);
+    // Check stock
+    if (!$product->has_enough_stock($quantity)) {
+        wc_add_notice(sprintf(
+            'Xin lỗi, chúng tôi chỉ còn %d sản phẩm "%s" trong kho.',
+            $product->get_stock_quantity(),
+            $product->get_name()
+        ), 'error');
+        return false;
+    }
     
-    $args = array(
-        'post_type' => 'product',
-        'post_status' => 'publish',
-        's' => $search_term,
-        'posts_per_page' => 8,
-        'meta_query' => array(
-            array(
-                'key' => '_stock_status',
-                'value' => 'instock'
-            )
-        )
+    // Check maximum quantity
+    $max_quantity = $product->get_max_purchase_quantity();
+    if ($max_quantity > 0 && $quantity > $max_quantity) {
+        wc_add_notice(sprintf(
+            'Bạn chỉ có thể mua tối đa %d sản phẩm "%s".',
+            $max_quantity,
+            $product->get_name()
+        ), 'error');
+        return false;
+    }
+    
+    return $passed;
+}
+add_filter('woocommerce_add_to_cart_validation', 'phonestore_validate_cart_quantities', 10, 3);
+
+// Customize remove from cart messages
+function phonestore_customize_remove_cart_message($message, $product_name) {
+    return sprintf('🗑️ Đã xóa "%s" khỏi giỏ hàng.', $product_name);
+}
+add_filter('wc_add_to_cart_message_html', 'phonestore_customize_remove_cart_message', 10, 2);
+
+// Uncomment this line to create sample products (run once)
+// add_action('wp_loaded', 'phonestore_create_sample_products');
+
+// Handle proceed to checkout with invoice email
+function phonestore_handle_proceed_to_checkout() {
+    // Check if this is a proceed to checkout request
+    if (isset($_POST['proceed_to_checkout']) && wp_verify_nonce($_POST['checkout_nonce'], 'proceed_to_checkout')) {
+        
+        // Check if user is logged in
+        if (!is_user_logged_in()) {
+            wc_add_notice('Vui lòng đăng nhập để tiếp tục thanh toán.', 'error');
+            return;
+        }
+        
+        $user = wp_get_current_user();
+        $cart = WC()->cart;
+        
+        if ($cart->is_empty()) {
+            wc_add_notice('Giỏ hàng của bạn đang trống.', 'error');
+            return;
+        }
+        
+        // Get user billing information
+        $billing_info = array(
+            'first_name' => get_user_meta($user->ID, 'billing_first_name', true) ?: $user->first_name,
+            'last_name' => get_user_meta($user->ID, 'billing_last_name', true) ?: $user->last_name,
+            'email' => get_user_meta($user->ID, 'billing_email', true) ?: $user->user_email,
+            'phone' => get_user_meta($user->ID, 'billing_phone', true),
+            'address_1' => get_user_meta($user->ID, 'billing_address_1', true),
+            'address_2' => get_user_meta($user->ID, 'billing_address_2', true),
+            'city' => get_user_meta($user->ID, 'billing_city', true),
+            'state' => get_user_meta($user->ID, 'billing_state', true),
+            'postcode' => get_user_meta($user->ID, 'billing_postcode', true),
+            'country' => get_user_meta($user->ID, 'billing_country', true)
+        );
+        
+        // Generate invoice number
+        $invoice_number = 'INV-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        
+        // Send invoice email
+        if (phonestore_send_invoice_email($billing_info, $cart, $invoice_number)) {
+            wc_add_notice('📧 Hóa đơn đã được gửi đến email của bạn. Vui lòng kiểm tra để xác nhận đơn hàng.', 'success');
+            
+            // Store invoice info in session for checkout page
+            WC()->session->set('pending_invoice', array(
+                'invoice_number' => $invoice_number,
+                'sent_time' => current_time('mysql'),
+                'customer_email' => $billing_info['email']
+            ));
+        } else {
+            wc_add_notice('❌ Có lỗi xảy ra khi gửi hóa đơn. Vui lòng thử lại.', 'error');
+        }
+    }
+}
+add_action('template_redirect', 'phonestore_handle_proceed_to_checkout');
+
+// Function to send invoice email
+function phonestore_send_invoice_email($billing_info, $cart, $invoice_number) {
+    $site_name = get_bloginfo('name');
+    $full_name = trim($billing_info['first_name'] . ' ' . $billing_info['last_name']);
+    $customer_email = $billing_info['email'];
+    
+    if (empty($customer_email)) {
+        return false;
+    }
+    
+    // Build full address
+    $address_parts = array_filter(array(
+        $billing_info['address_1'],
+        $billing_info['address_2'],
+        $billing_info['city'],
+        $billing_info['state'],
+        $billing_info['postcode']
+    ));
+    $full_address = implode(', ', $address_parts);
+    
+    // Email subject
+    $subject = '📧 Hóa đơn tạm thời - ' . $invoice_number . ' từ ' . $site_name;
+    
+    // Build email content
+    $message = phonestore_build_invoice_email_content($billing_info, $cart, $invoice_number, $full_name, $full_address);
+    
+    // Email headers
+    $headers = array(
+        'Content-Type: text/html; charset=UTF-8',
+        'From: ' . $site_name . ' <noreply@' . $_SERVER['HTTP_HOST'] . '>',
+        'Reply-To: ' . get_option('admin_email')
     );
     
-    $products = get_posts($args);
-    $results = array();
+    // Send email
+    $sent = wp_mail($customer_email, $subject, $message, $headers);
     
-    foreach ($products as $product) {
-        $wc_product = wc_get_product($product->ID);
-        $results[] = array(
-            'id' => $product->ID,
-            'title' => $product->post_title,
-            'price' => $wc_product->get_price_html(),
-            'image' => get_the_post_thumbnail_url($product->ID, 'thumbnail') ?: wc_placeholder_img_src()
-        );
+    // Also send copy to admin
+    if ($sent) {
+        $admin_subject = '[ADMIN] Hóa đơn mới - ' . $invoice_number;
+        $admin_message = phonestore_build_admin_invoice_notification($billing_info, $cart, $invoice_number, $full_name);
+        wp_mail(get_option('admin_email'), $admin_subject, $admin_message, $headers);
+        
+        // Log invoice
+        phonestore_log_invoice($invoice_number, $billing_info, $cart);
     }
     
-    wp_send_json_success($results);
+    return $sent;
 }
-add_action('wp_ajax_search_products_for_compare', 'search_products_for_compare');
-add_action('wp_ajax_nopriv_search_products_for_compare', 'search_products_for_compare');
 
-function load_compare_table() {
-    if (!wp_verify_nonce($_POST['nonce'], 'phonestore_nonce')) {
-        wp_die('Security check failed');
-    }
+// Build customer invoice email content
+function phonestore_build_invoice_email_content($billing_info, $cart, $invoice_number, $full_name, $full_address) {
+    $site_name = get_bloginfo('name');
+    $currency_symbol = get_woocommerce_currency_symbol();
     
-    $product_ids = array_map('intval', $_POST['products']);
-    
-    if (empty($product_ids)) {
-        wp_send_json_error('No products selected');
-    }
-    
-    $products = array();
-    foreach ($product_ids as $id) {
-        $product = wc_get_product($id);
-        if ($product) {
-            $products[] = $product;
-        }
-    }
-    
-    if (empty($products)) {
-        wp_send_json_error('No valid products found');
-    }
-    
-    // Tạo bảng so sánh
     ob_start();
     ?>
-    <div class="compare-table-wrapper">
-        <table class="compare-table">
-            <thead>
-                <tr>
-                    <td class="spec-label">Sản phẩm</td>
-                    <?php foreach ($products as $product): ?>
-                        <td class="product-column">
-                            <div class="product-compare-header">
-                                <button class="remove-from-compare" data-product-id="<?php echo $product->get_id(); ?>">&times;</button>
-                                <img src="<?php echo wp_get_attachment_image_url($product->get_image_id(), 'thumbnail'); ?>" 
-                                     alt="<?php echo $product->get_name(); ?>">
-                                <h4><a href="<?php echo $product->get_permalink(); ?>"><?php echo $product->get_name(); ?></a></h4>
-                                <div class="price"><?php echo $product->get_price_html(); ?></div>
-                                <div class="rating">
-                                    <?php echo wc_get_rating_html($product->get_average_rating()); ?>
-                                    <span class="review-count">(<?php echo $product->get_review_count(); ?> đánh giá)</span>
-                                </div>
-                                <a href="<?php echo $product->add_to_cart_url(); ?>" class="button add-to-cart">
-                                    Thêm vào giỏ
-                                </a>
-                            </div>
-                        </td>
-                    <?php endforeach; ?>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $specs = array(
-                    'brand' => 'Thương hiệu',
-                    'display_size' => 'Kích thước màn hình',
-                    'display_resolution' => 'Độ phân giải',
-                    'display_type' => 'Loại màn hình',
-                    'cpu' => 'Vi xử lý',
-                    'ram' => 'RAM',
-                    'storage' => 'Bộ nhớ trong',
-                    'rear_camera' => 'Camera sau',
-                    'front_camera' => 'Camera trước',
-                    'battery' => 'Pin',
-                    'os' => 'Hệ điều hành',
-                    'dimensions' => 'Kích thước',
-                    'weight' => 'Trọng lượng',
-                    'colors' => 'Màu sắc',
-                    'sim' => 'Loại SIM',
-                    'network' => 'Mạng hỗ trợ'
-                );
-                
-                foreach ($specs as $field => $label):
-                    // Kiểm tra xem có ít nhất 1 sản phẩm có field này không
-                    $has_data = false;
-                    foreach ($products as $product) {
-                        if (get_field($field, $product->get_id())) {
-                            $has_data = true;
-                            break;
-                        }
-                    }
-                    
-                    if (!$has_data) continue;
-                ?>
-                    <tr>
-                        <td class="spec-label"><?php echo $label; ?></td>
-                        <?php foreach ($products as $product): ?>
-                            <td class="spec-value">
-                                <?php 
-                                $value = get_field($field, $product->get_id());
-                                echo $value ? $value : '—';
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Hóa đơn - <?php echo $invoice_number; ?></title>
+        <style>
+            body { 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                line-height: 1.6; 
+                color: #333; 
+                margin: 0; 
+                padding: 0;
+                background-color: #f8f9fa;
+            }
+            .container { 
+                max-width: 800px; 
+                margin: 0 auto; 
+                background: white;
+                box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            }
+            .header { 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white; 
+                padding: 40px 30px; 
+                text-align: center;
+            }
+            .header h1 {
+                margin: 0 0 10px 0;
+                font-size: 28px;
+                font-weight: 700;
+            }
+            .header p {
+                margin: 0;
+                font-size: 16px;
+                opacity: 0.9;
+            }
+            .content { 
+                padding: 40px 30px;
+            }
+            .invoice-info {
+                background: #f8f9fa;
+                padding: 25px;
+                border-radius: 12px;
+                margin-bottom: 30px;
+                border-left: 4px solid #667eea;
+            }
+            .invoice-info h2 {
+                color: #667eea;
+                margin-top: 0;
+                font-size: 20px;
+            }
+            .info-row {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 12px;
+                flex-wrap: wrap;
+            }
+            .info-label {
+                font-weight: 600;
+                color: #495057;
+                min-width: 120px;
+            }
+            .info-value {
+                color: #212529;
+                flex: 1;
+                text-align: right;
+            }
+            .customer-info {
+                background: #e3f2fd;
+                padding: 25px;
+                border-radius: 12px;
+                margin-bottom: 30px;
+            }
+            .customer-info h3 {
+                color: #1976d2;
+                margin-top: 0;
+                font-size: 18px;
+            }
+            .items-table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin: 25px 0;
+                background: white;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .items-table th, .items-table td { 
+                padding: 15px; 
+                text-align: left; 
+                border-bottom: 1px solid #dee2e6;
+            }
+            .items-table th { 
+                background: #495057; 
+                color: white; 
+                font-weight: 600;
+                text-transform: uppercase;
+                font-size: 12px;
+                letter-spacing: 1px;
+            }
+            .items-table tr:nth-child(even) {
+                background: #f8f9fa;
+            }
+            .items-table tr:hover {
+                background: #e9ecef;
+            }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .total-row {
+                background: #28a745 !important;
+                color: white !important;
+                font-weight: bold;
+            }
+            .total-row td {
+                border-bottom: none !important;
+                font-size: 18px;
+                padding: 20px 15px;
+            }
+            .subtotal-row {
+                background: #17a2b8 !important;
+                color: white !important;
+                font-weight: 600;
+            }
+            .notes {
+                background: #fff3cd;
+                border: 1px solid #ffeaa7;
+                padding: 20px;
+                border-radius: 8px;
+                margin: 25px 0;
+            }
+            .notes h4 {
+                color: #856404;
+                margin-top: 0;
+            }
+            .footer { 
+                background: #495057; 
+                color: white; 
+                padding: 30px; 
+                text-align: center;
+            }
+            .footer h4 {
+                margin-top: 0;
+                color: #fff;
+            }
+            .contact-info {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 20px;
+                margin-top: 20px;
+            }
+            .contact-item {
+                text-align: center;
+            }
+            .next-steps {
+                background: #d4edda;
+                border: 1px solid #c3e6cb;
+                padding: 25px;
+                border-radius: 8px;
+                margin: 25px 0;
+            }
+            .next-steps h4 {
+                color: #155724;
+                margin-top: 0;
+            }
+            .next-steps ol {
+                color: #155724;
+                padding-left: 20px;
+            }
+            .next-steps li {
+                margin-bottom: 8px;
+            }
+            @media (max-width: 600px) {
+                .container { margin: 10px; }
+                .content { padding: 20px; }
+                .header { padding: 30px 20px; }
+                .items-table { font-size: 14px; }
+                .items-table th, .items-table td { padding: 10px 8px; }
+                .info-row { flex-direction: column; }
+                .info-value { text-align: left; margin-top: 5px; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>📧 HÓA ĐƠN TẠM THỜI</h1>
+                <p>Cảm ơn bạn đã chọn <?php echo $site_name; ?></p>
+            </div>
+            
+            <div class="content">
+                <div class="invoice-info">
+                    <h2>📋 Thông tin hóa đơn</h2>
+                    <div class="info-row">
+                        <span class="info-label">Số hóa đơn:</span>
+                        <span class="info-value"><strong><?php echo $invoice_number; ?></strong></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Ngày tạo:</span>
+                        <span class="info-value"><?php echo date('d/m/Y H:i:s'); ?></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Trạng thái:</span>
+                        <span class="info-value"><strong style="color: #ffc107;">⏳ Chờ xác nhận</strong></span>
+                    </div>
+                </div>
+
+                <div class="customer-info">
+                    <h3>👤 Thông tin khách hàng</h3>
+                    <div class="info-row">
+                        <span class="info-label">Họ và tên:</span>
+                        <span class="info-value"><?php echo esc_html($full_name); ?></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Email:</span>
+                        <span class="info-value"><?php echo esc_html($billing_info['email']); ?></span>
+                    </div>
+                    <?php if ($billing_info['phone']): ?>
+                    <div class="info-row">
+                        <span class="info-label">Điện thoại:</span>
+                        <span class="info-value"><?php echo esc_html($billing_info['phone']); ?></span>
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($full_address): ?>
+                    <div class="info-row">
+                        <span class="info-label">Địa chỉ:</span>
+                        <span class="info-value"><?php echo esc_html($full_address); ?></span>
+                    </div>
+                    <?php endif; ?>
+                </div>
+
+                <h3>🛒 Chi tiết đơn hàng</h3>
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60%">Sản phẩm</th>
+                            <th class="text-center" style="width: 15%">Số lượng</th>
+                            <th class="text-right" style="width: 25%">Thành tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($cart->get_cart() as $cart_item): 
+                            $product = $cart_item['data'];
+                            $quantity = $cart_item['quantity'];
+                            $subtotal = $cart->get_product_subtotal($product, $quantity);
+                        ?>
+                        <tr>
+                            <td>
+                                <strong><?php echo esc_html($product->get_name()); ?></strong>
+                                <?php
+                                // Show product specs if available
+                                if (function_exists('get_field')) {
+                                    $ram = get_field('ram', $product->get_id());
+                                    $storage = get_field('storage', $product->get_id());
+                                    if ($ram || $storage) {
+                                        echo '<br><small style="color: #666;">';
+                                        if ($ram) echo '💾 RAM: ' . strtoupper($ram) . ' ';
+                                        if ($storage) echo '💿 Bộ nhớ: ' . strtoupper($storage);
+                                        echo '</small>';
+                                    }
+                                }
                                 ?>
+                                <br><small style="color: #888;">Đơn giá: <?php echo wc_price($product->get_price()); ?></small>
                             </td>
+                            <td class="text-center">
+                                <strong><?php echo $quantity; ?></strong>
+                            </td>
+                            <td class="text-right">
+                                <strong><?php echo $subtotal; ?></strong>
+                            </td>
+                        </tr>
                         <?php endforeach; ?>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    
-    <style>
-    .compare-table-wrapper {
-        overflow-x: auto;
-        margin: 20px 0;
-    }
-    
-    .compare-table {
-        width: 100%;
-        min-width: 800px;
-        border-collapse: collapse;
-        background: white;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    
-    .compare-table td {
-        border: 1px solid #ddd;
-        padding: 15px;
-        text-align: center;
-        vertical-align: top;
-    }
-    
-    .spec-label {
-        background: #f8f9fa;
-        font-weight: bold;
-        text-align: left !important;
-        min-width: 150px;
-    }
-    
-    .product-column {
-        position: relative;
-        min-width: 200px;
-    }
-    
-    .product-compare-header {
-        position: relative;
-    }
-    
-    .remove-from-compare {
-        position: absolute;
-        top: 5px;
-        right: 5px;
-        background: #ff4444;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 25px;
-        height: 25px;
-        cursor: pointer;
-        font-size: 16px;
-        line-height: 1;
-    }
-    
-    .product-compare-header img {
-        width: 120px;
-        height: 120px;
-        object-fit: cover;
-        margin-bottom: 10px;
-    }
-    
-    .product-compare-header h4 {
-        margin: 10px 0;
-        font-size: 16px;
-    }
-    
-    .product-compare-header h4 a {
-        text-decoration: none;
-        color: #333;
-    }
-    
-    .price {
-        font-size: 18px;
-        font-weight: bold;
-        color: #e74c3c;
-        margin: 10px 0;
-    }
-    
-    .rating {
-        margin: 10px 0;
-    }
-    
-    .review-count {
-        font-size: 12px;
-        color: #666;
-    }
-    
-    .add-to-cart {
-        background: #007cba;
-        color: white;
-        padding: 8px 16px;
-        text-decoration: none;
-        border-radius: 4px;
-        display: inline-block;
-        margin-top: 10px;
-    }
-    
-    .spec-value {
-        font-size: 14px;
-        line-height: 1.4;
-    }
-    
-    @media (max-width: 768px) {
-        .compare-table {
-            font-size: 12px;
-        }
-        
-        .product-compare-header img {
-            width: 80px;
-            height: 80px;
-        }
-        
-        .product-compare-header h4 {
-            font-size: 14px;
-        }
-    }
-    </style>
+                        
+                        <tr class="subtotal-row">
+                            <td colspan="2"><strong>Tạm tính</strong></td>
+                            <td class="text-right"><strong><?php echo wc_price($cart->get_cart_contents_total()); ?></strong></td>
+                        </tr>
+                        
+                        <?php if ($cart->get_shipping_total() > 0): ?>
+                        <tr>
+                            <td colspan="2">🚚 Phí vận chuyển</td>
+                            <td class="text-right"><?php echo wc_price($cart->get_shipping_total()); ?></td>
+                        </tr>
+                        <?php endif; ?>
+                        
+                        <?php if ($cart->get_fee_total() > 0): ?>
+                        <tr>
+                            <td colspan="2">📋 Phí khác</td>
+                            <td class="text-right"><?php echo wc_price($cart->get_fee_total()); ?></td>
+                        </tr>
+                        <?php endif; ?>
+                        
+                        <?php if ($cart->get_discount_total() > 0): ?>
+                        <tr style="background: #f8d7da;">
+                            <td colspan="2">🎟️ Giảm giá</td>
+                            <td class="text-right">-<?php echo wc_price($cart->get_discount_total()); ?></td>
+                        </tr>
+                        <?php endif; ?>
+                        
+                        <tr class="total-row">
+                            <td colspan="2"><strong>🏆 TỔNG CỘNG</strong></td>
+                            <td class="text-right"><strong><?php echo wc_price($cart->get_total('edit')); ?></strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="next-steps">
+                    <h4>📋 Các bước tiếp theo:</h4>
+                    <ol>
+                        <li><strong>Xác nhận đơn hàng:</strong> Vui lòng kiểm tra lại thông tin đơn hàng ở trên</li>
+                        <li><strong>Liên hệ xác nhận:</strong> Chúng tôi sẽ gọi điện xác nhận trong vòng 24h</li>
+                        <li><strong>Thanh toán:</strong> Thanh toán khi nhận hàng hoặc chuyển khoản trước</li>
+                        <li><strong>Giao hàng:</strong> Sản phẩm sẽ được giao trong 1-3 ngày làm việc</li>
+                    </ol>
+                </div>
+
+                <div class="notes">
+                    <h4>📝 Lưu ý quan trọng:</h4>
+                    <ul>
+                        <li>Đây là <strong>hóa đơn tạm thời</strong>, chưa phải hóa đơn chính thức</li>
+                        <li>Vui lòng <strong>giữ lại email này</strong> để đối chiếu khi nhận hàng</li>
+                        <li>Nếu có thắc mắc, vui lòng liên hệ hotline: <strong>0123.456.789</strong></li>
+                        <li>Hóa đơn VAT sẽ được xuất sau khi hoàn tất thanh toán</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <h4>📞 Thông tin liên hệ</h4>
+                <div class="contact-info">
+                    <div class="contact-item">
+                        <strong>📍 Địa chỉ</strong><br>
+                        Purple House, Ninh Kiều<br>
+                        Cần Thơ, Việt Nam
+                    </div>
+                    <div class="contact-item">
+                        <strong>📱 Hotline</strong><br>
+                        0123.456.789<br>
+                        098.765.4321
+                    </div>
+                    <div class="contact-item">
+                        <strong>✉️ Email</strong><br>
+                        info@phonestore.com<br>
+                        support@phonestore.com
+                    </div>
+                    <div class="contact-item">
+                        <strong>🕐 Giờ làm việc</strong><br>
+                        T2-T6: 8:00-21:00<br>
+                        T7-CN: 8:00-22:00
+                    </div>
+                </div>
+                <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #6c757d;">
+                    <small>© <?php echo date('Y'); ?> <?php echo $site_name; ?>. Tất cả các quyền được bảo lưu.</small>
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
     <?php
+    return ob_get_clean();
+}
+
+// Build admin notification email
+function phonestore_build_admin_invoice_notification($billing_info, $cart, $invoice_number, $full_name) {
+    $site_name = get_bloginfo('name');
     
-    $html = ob_get_clean();
-    wp_send_json_success($html);
+    ob_start();
+    ?>
+    <h2>🔔 Hóa đơn mới từ website</h2>
+    
+    <h3>📋 Thông tin hóa đơn:</h3>
+    <ul>
+        <li><strong>Số hóa đơn:</strong> <?php echo $invoice_number; ?></li>
+        <li><strong>Thời gian:</strong> <?php echo date('d/m/Y H:i:s'); ?></li>
+        <li><strong>Tổng tiền:</strong> <?php echo wc_price($cart->get_total('edit')); ?></li>
+    </ul>
+    
+    <h3>👤 Thông tin khách hàng:</h3>
+    <ul>
+        <li><strong>Tên:</strong> <?php echo esc_html($full_name); ?></li>
+        <li><strong>Email:</strong> <?php echo esc_html($billing_info['email']); ?></li>
+        <li><strong>Điện thoại:</strong> <?php echo esc_html($billing_info['phone']); ?></li>
+    </ul>
+    
+    <h3>🛒 Sản phẩm:</h3>
+    <ul>
+    <?php foreach ($cart->get_cart() as $cart_item): 
+        $product = $cart_item['data'];
+        $quantity = $cart_item['quantity'];
+    ?>
+        <li><?php echo esc_html($product->get_name()); ?> x <?php echo $quantity; ?> = <?php echo $cart->get_product_subtotal($product, $quantity); ?></li>
+    <?php endforeach; ?>
+    </ul>
+    
+    <p><strong>⚠️ Vui lòng liên hệ khách hàng để xác nhận đơn hàng trong 24h.</strong></p>
+    <?php
+    return ob_get_clean();
 }
-add_action('wp_ajax_load_compare_table', 'load_compare_table');
-add_action('wp_ajax_nopriv_load_compare_table', 'load_compare_table');
 
-// Thêm vào functions.php
-// Include custom shipping class
-require_once get_template_directory() . '/includes/class-distance-shipping.php';
-
-function add_distance_based_shipping($methods) {
-    $methods['distance_based_shipping'] = 'Distance_Based_Shipping';
-    return $methods;
+// Log invoice for tracking
+function phonestore_log_invoice($invoice_number, $billing_info, $cart) {
+    $log_data = array(
+        'invoice_number' => $invoice_number,
+        'customer_email' => $billing_info['email'],
+        'customer_name' => trim($billing_info['first_name'] . ' ' . $billing_info['last_name']),
+        'total_amount' => $cart->get_total('edit'),
+        'items_count' => $cart->get_cart_contents_count(),
+        'created_at' => current_time('mysql'),
+        'status' => 'pending'
+    );
+    
+    // Store in database or log file
+    error_log('Invoice created: ' . json_encode($log_data));
+    
+    // You can also store in custom table if needed
+    // global $wpdb;
+    // $wpdb->insert('wp_phonestore_invoices', $log_data);
 }
-add_filter('woocommerce_shipping_methods', 'add_distance_based_shipping');
 
-// Tạo thư mục includes nếu chưa có
-function create_includes_directory() {
-    $includes_dir = get_template_directory() . '/includes';
-    if (!file_exists($includes_dir)) {
-        wp_mkdir_p($includes_dir);
+// Handle resend invoice AJAX
+function phonestore_resend_invoice() {
+    if (!wp_verify_nonce($_POST['nonce'], 'phonestore_nonce')) {
+        wp_send_json_error('Security check failed');
+        return;
+    }
+    
+    if (!is_user_logged_in()) {
+        wp_send_json_error('User not logged in');
+        return;
+    }
+    
+    $invoice_number = sanitize_text_field($_POST['invoice_number']);
+    
+    if (empty($invoice_number)) {
+        wp_send_json_error('Invalid invoice number');
+        return;
+    }
+    
+    $user = wp_get_current_user();
+    $cart = WC()->cart;
+    
+    if ($cart->is_empty()) {
+        wp_send_json_error('Cart is empty');
+        return;
+    }
+    
+    // Get user billing information
+    $billing_info = array(
+        'first_name' => get_user_meta($user->ID, 'billing_first_name', true) ?: $user->first_name,
+        'last_name' => get_user_meta($user->ID, 'billing_last_name', true) ?: $user->last_name,
+        'email' => get_user_meta($user->ID, 'billing_email', true) ?: $user->user_email,
+        'phone' => get_user_meta($user->ID, 'billing_phone', true),
+        'address_1' => get_user_meta($user->ID, 'billing_address_1', true),
+        'address_2' => get_user_meta($user->ID, 'billing_address_2', true),
+        'city' => get_user_meta($user->ID, 'billing_city', true),
+        'state' => get_user_meta($user->ID, 'billing_state', true),
+        'postcode' => get_user_meta($user->ID, 'billing_postcode', true),
+        'country' => get_user_meta($user->ID, 'billing_country', true)
+    );
+    
+    // Resend invoice email
+    if (phonestore_send_invoice_email($billing_info, $cart, $invoice_number)) {
+        wp_send_json_success('Invoice resent successfully');
+    } else {
+        wp_send_json_error('Failed to resend invoice');
     }
 }
-add_action('after_setup_theme', 'create_includes_directory');
+add_action('wp_ajax_phonestore_resend_invoice', 'phonestore_resend_invoice');
+add_action('wp_ajax_nopriv_phonestore_resend_invoice', 'phonestore_resend_invoice');
 
-// Thêm vào functions.php
-function custom_bank_transfer_instructions($order_id) {
-    $order = wc_get_order($order_id);
-    
-    if ($order->get_payment_method() === 'bacs') {
-        echo '<div class="bank-transfer-info">';
-        echo '<h3>Thông tin chuyển khoản:</h3>';
-        echo '<div class="bank-details">';
-        echo '<p><strong>Ngân hàng:</strong> Vietcombank</p>';
-        echo '<p><strong>Số tài khoản:</strong> 1234567890</p>';
-        echo '<p><strong>Chủ tài khoản:</strong> CONG TY TNHH ABC</p>';
-        echo '<p><strong>Số tiền:</strong> ' . wc_price($order->get_total()) . '</p>';
-        echo '<p><strong>Nội dung chuyển khoản:</strong> DH' . $order->get_order_number() . '</p>';
-        echo '</div>';
-        echo '<p><em>Vui lòng chuyển khoản và gửi ảnh chụp biên lai về Zalo: 0123456789</em></p>';
+// Debug function to check if pages exist and are properly linked
+function phonestore_debug_pages() {
+    if (current_user_can('administrator') && isset($_GET['debug_pages'])) {
+        echo '<div style="background: white; padding: 20px; margin: 20px; border: 2px solid #007cba; border-radius: 10px;">';
+        echo '<h3>🔧 Debug Pages Info</h3>';
+        
+        // Check contact page
+        $contact_page = get_page_by_path('lien-he');
+        echo '<p><strong>Contact Page (lien-he):</strong> ';
+        if ($contact_page) {
+            echo '✅ Found - ID: ' . $contact_page->ID . ' - URL: <a href="' . get_permalink($contact_page->ID) . '">' . get_permalink($contact_page->ID) . '</a>';
+        } else {
+            echo '❌ Not found';
+        }
+        echo '</p>';
+        
+        // Check compare page
+        $compare_page = get_page_by_path('so-sanh-san-pham');
+        echo '<p><strong>Compare Page (so-sanh-san-pham):</strong> ';
+        if ($compare_page) {
+            echo '✅ Found - ID: ' . $compare_page->ID . ' - URL: <a href="' . get_permalink($compare_page->ID) . '">' . get_permalink($compare_page->ID) . '</a>';
+        } else {
+            echo '❌ Not found';
+        }
+        echo '</p>';
+        
+        // Check current page
+        echo '<p><strong>Current Page:</strong> ' . get_the_title() . ' (ID: ' . get_the_ID() . ')</p>';
+        echo '<p><strong>Current URL:</strong> ' . home_url($_SERVER['REQUEST_URI']) . '</p>';
+        
+        // Check menu
+        $menu = wp_get_nav_menu_object('Main Menu');
+        echo '<p><strong>Main Menu:</strong> ';
+        if ($menu) {
+            echo '✅ Found - ID: ' . $menu->term_id;
+        } else {
+            echo '❌ Not found';
+        }
+        echo '</p>';
+        
+        echo '<p><em>Add ?debug_pages=1 to any URL to see this debug info</em></p>';
         echo '</div>';
     }
 }
-add_action('woocommerce_thankyou', 'custom_bank_transfer_instructions');
+add_action('wp_footer', 'phonestore_debug_pages');
 
+// Force create pages if they don't exist
+function phonestore_ensure_pages_exist() {
+    // Create contact page if it doesn't exist
+    $contact_page = get_page_by_path('lien-he');
+    if (!$contact_page) {
+        $contact_id = wp_insert_post(array(
+            'post_title' => 'Liên Hệ',
+            'post_name' => 'lien-he',
+            'post_content' => '<!-- This content will be overridden by the template -->',
+            'post_status' => 'publish',
+            'post_type' => 'page',
+            'page_template' => 'page-lien-he.php'
+        ));
+        
+        if ($contact_id) {
+            update_post_meta($contact_id, '_wp_page_template', 'page-lien-he.php');
+        }
+    }
+    
+    // Create compare page if it doesn't exist
+    $compare_page = get_page_by_path('so-sanh-san-pham');
+    if (!$compare_page) {
+        $compare_id = wp_insert_post(array(
+            'post_title' => 'So Sánh Sản Phẩm',
+            'post_name' => 'so-sanh-san-pham',
+            'post_content' => '<!-- This content will be overridden by the template -->',
+            'post_status' => 'publish',
+            'post_type' => 'page',
+            'page_template' => 'page-so-sanh-san-pham.php'
+        ));
+        
+        if ($compare_id) {
+            update_post_meta($compare_id, '_wp_page_template', 'page-so-sanh-san-pham.php');
+        }
+    }
+}
 
+// Run when admin visits any page
+add_action('admin_init', 'phonestore_ensure_pages_exist');
+
+// Also run on theme activation
+add_action('after_switch_theme', 'phonestore_ensure_pages_exist');
+
+// Fix menu creation to include proper page links
+function phonestore_recreate_menu_with_pages() {
+    // Delete existing menu
+    $existing_menu = wp_get_nav_menu_object('Main Menu');
+    if ($existing_menu) {
+        wp_delete_nav_menu($existing_menu->term_id);
+    }
+    
+    // Create new menu
+    $menu_id = wp_create_nav_menu('Main Menu');
+    
+    if (!is_wp_error($menu_id)) {
+        // Add Home
+        wp_update_nav_menu_item($menu_id, 0, array(
+            'menu-item-title' => '🏠 Trang chủ',
+            'menu-item-url' => home_url('/'),
+            'menu-item-status' => 'publish',
+            'menu-item-type' => 'custom'
+        ));
+        
+        // Add Shop
+        wp_update_nav_menu_item($menu_id, 0, array(
+            'menu-item-title' => '🛒 Sản phẩm',
+            'menu-item-url' => home_url('/shop/'),
+            'menu-item-status' => 'publish',
+            'menu-item-type' => 'custom'
+        ));
+        
+        // Add Compare page
+        $compare_page = get_page_by_path('so-sanh-san-pham');
+        if ($compare_page) {
+            wp_update_nav_menu_item($menu_id, 0, array(
+                'menu-item-title' => '⚖️ So sánh',
+                'menu-item-object' => 'page',
+                'menu-item-object-id' => $compare_page->ID,
+                'menu-item-type' => 'post_type',
+                'menu-item-status' => 'publish'
+            ));
+        }
+        
+        // Add Contact page
+        $contact_page = get_page_by_path('lien-he');
+        if ($contact_page) {
+            wp_update_nav_menu_item($menu_id, 0, array(
+                'menu-item-title' => '📞 Liên hệ',
+                'menu-item-object' => 'page',
+                'menu-item-object-id' => $contact_page->ID,
+                'menu-item-type' => 'post_type',
+                'menu-item-status' => 'publish'
+            ));
+        }
+        
+        // Assign menu to location
+        $locations = get_theme_mod('nav_menu_locations');
+        $locations['primary'] = $menu_id;
+        set_theme_mod('nav_menu_locations', $locations);
+    }
+}
+
+// Add admin notice with button to recreate menu
+function phonestore_admin_menu_notice() {
+    if (current_user_can('administrator')) {
+        $contact_page = get_page_by_path('lien-he');
+        $compare_page = get_page_by_path('so-sanh-san-pham');
+        
+        if (!$contact_page || !$compare_page) {
+            echo '<div class="notice notice-warning is-dismissible">';
+            echo '<p><strong>PhoneStore Theme:</strong> Một số trang chưa được tạo. ';
+            echo '<a href="' . admin_url('?phonestore_create_pages=1') . '" class="button button-primary">Tạo trang ngay</a>';
+            echo '</p>';
+            echo '</div>';
+        }
+    }
+}
+add_action('admin_notices', 'phonestore_admin_menu_notice');
+
+// Handle create pages action
+function phonestore_handle_create_pages() {
+    if (isset($_GET['phonestore_create_pages']) && current_user_can('administrator')) {
+        phonestore_ensure_pages_exist();
+        phonestore_recreate_menu_with_pages();
+        
+        wp_redirect(admin_url('nav-menus.php?created=1'));
+        exit;
+    }
+}
+add_action('admin_init', 'phonestore_handle_create_pages');
 ?>
