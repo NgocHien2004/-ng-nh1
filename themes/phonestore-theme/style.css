@@ -1,0 +1,68 @@
+/*
+Theme Name: PhoneStore Theme
+Description: Theme chuyên dụng cho cửa hàng điện thoại
+Version: 1.0
+*/
+
+/* Import Storefront parent theme */
+@import url("../storefront/style.css");
+
+/* Custom CSS cho điện thoại */
+.product-specs-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+.product-specs-table th,
+.product-specs-table td {
+  border: 1px solid #ddd;
+  padding: 12px;
+  text-align: left;
+}
+
+.product-specs-table th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+}
+
+.phone-search-container {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+
+.phone-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.phone-filters select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.product-comparison-table {
+  overflow-x: auto;
+}
+
+.compare-table {
+  min-width: 800px;
+  width: 100%;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .phone-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .product-specs-table {
+    font-size: 14px;
+  }
+}

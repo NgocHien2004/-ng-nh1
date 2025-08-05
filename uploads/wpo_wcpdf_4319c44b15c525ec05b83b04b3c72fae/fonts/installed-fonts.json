@@ -1,0 +1,26 @@
+{
+    "open sans": {
+        "normal": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/OpenSans-Normal",
+        "bold": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/OpenSans-Bold",
+        "italic": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/OpenSans-Italic",
+        "bold_italic": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/OpenSans-BoldItalic"
+    },
+    "segoe": {
+        "normal": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/Segoe-Normal",
+        "bold": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/Segoe-Bold",
+        "italic": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/Segoe-Italic",
+        "bold_italic": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/Segoe-BoldItalic"
+    },
+    "roboto slab": {
+        "normal": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/RobotoSlab-Normal",
+        "bold": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/RobotoSlab-Bold",
+        "italic": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/RobotoSlab-Italic",
+        "bold_italic": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/RobotoSlab-BoldItalic"
+    },
+    "currencies": {
+        "normal": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/currencies",
+        "bold": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/currencies",
+        "italic": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/currencies",
+        "bold_italic": "D:\/xampp\/htdocs\/phonestore\/wp-content\/uploads\/wpo_wcpdf_4319c44b15c525ec05b83b04b3c72fae\/fonts\/currencies"
+    }
+}
