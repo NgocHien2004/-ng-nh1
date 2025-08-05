@@ -1590,4 +1590,627 @@ function phonestore_handle_create_pages() {
     }
 }
 add_action('admin_init', 'phonestore_handle_create_pages');
+
+// AJAX handler for loading products
+function phonestore_load_products() {
+    if (!wp_verify_nonce($_POST['nonce'], 'phonestore_nonce')) {
+        wp_die('Security check failed');
+    }
+    
+    $filters = $_POST['filters'];
+    $page = intval($filters['page']) ?: 1;
+    $per_page = 12;
+    
+    $args = array(
+        'post_type' => 'product',
+        'post_status' => 'publish',
+        'posts_per_page' => $per_page,
+        'paged' => $page,
+        'meta_query' => array('relation' => 'AND')
+    );
+    
+    // Brand filter
+    if (!empty($filters['brand'])) {
+        $args['meta_query'][] = array(
+            'key' => 'brand',
+            'value' => $filters['brand'],
+            'compare' => '='
+        );
+    }
+    
+    // RAM filter
+    if (!empty($filters['ram'])) {
+        $args['meta_query'][] = array(
+            'key' => 'ram',
+            'value' => $filters['ram'],
+            'compare' => '='
+        );
+    }
+    
+    // Storage filter
+    if (!empty($filters['storage'])) {
+        $args['meta_query'][] = array(
+            'key' => 'storage',
+            'value' => $filters['storage'],
+            'compare' => '='
+        );
+    }
+    
+    // Price filter
+    if (!empty($filters['price'])) {
+        $price_range = explode('-', $filters['price']);
+        $min_price = intval($price_range[0]) * 1000000;
+        $max_price = intval($price_range[1]) * 1000000;
+        
+        $args['meta_query'][] = array(
+            'key' => '_price',
+            'value' => array($min_price, $max_price),
+            'type' => 'NUMERIC',
+            'compare' => 'BETWEEN'
+        );
+    }
+    
+    // Search filter
+    if (!empty($filters['search'])) {
+        $args['s'] = sanitize_text_field($filters['search']);
+    }
+    
+    // Sorting
+    if (!empty($filters['sort'])) {
+        switch ($filters['sort']) {
+            case 'price-asc':
+                $args['meta_key'] = '_price';
+                $args['orderby'] = 'meta_value_num';
+                $args['order'] = 'ASC';
+                break;
+            case 'price-desc':
+                $args['meta_key'] = '_price';
+                $args['orderby'] = 'meta_value_num';
+                $args['order'] = 'DESC';
+                break;
+            case 'name-asc':
+                $args['orderby'] = 'title';
+                $args['order'] = 'ASC';
+                break;
+            case 'name-desc':
+                $args['orderby'] = 'title';
+                $args['order'] = 'DESC';
+                break;
+            case 'newest':
+                $args['orderby'] = 'date';
+                $args['order'] = 'DESC';
+                break;
+        }
+    }
+    
+    $query = new WP_Query($args);
+    $products = array();
+    
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+            $product_id = get_the_ID();
+            $wc_product = wc_get_product($product_id);
+            
+            $specs = array();
+            if (function_exists('get_field')) {
+                $ram = get_field('ram', $product_id);
+                $storage = get_field('storage', $product_id);
+                $camera = get_field('rear_camera', $product_id);
+                
+                if ($ram) $specs[] = '💾 ' . strtoupper($ram);
+                if ($storage) $specs[] = '💿 ' . strtoupper($storage);
+                if ($camera) $specs[] = '📷 ' . $camera;
+            }
+            
+            $products[] = array(
+                'id' => $product_id,
+                'name' => get_the_title(),
+                'price' => $wc_product ? $wc_product->get_price_html() : 'Liên hệ',
+                'image' => get_the_post_thumbnail_url($product_id, 'medium') ?: 'https://via.placeholder.com/300x300?text=No+Image',
+                'specs' => $specs,
+                'url' => get_permalink($product_id)
+            );
+        }
+        wp_reset_postdata();
+    }
+    
+    wp_send_json_success(array(
+        'products' => $products,
+        'total' => $query->found_posts,
+        'pages' => $query->max_num_pages
+    ));
+}
+add_action('wp_ajax_phonestore_load_products', 'phonestore_load_products');
+add_action('wp_ajax_nopriv_phonestore_load_products', 'phonestore_load_products');
+
+// Handle shop page filters
+function phonestore_handle_shop_filters($query) {
+    if (!is_admin() && $query->is_main_query()) {
+        if (is_shop() || is_product_category() || is_product_tag()) {
+            // Brand filter
+            if (isset($_GET['filter_brand']) && !empty($_GET['filter_brand'])) {
+                $meta_query = $query->get('meta_query') ?: array();
+                $meta_query[] = array(
+                    'key' => 'brand',
+                    'value' => sanitize_text_field($_GET['filter_brand']),
+                    'compare' => '='
+                );
+                $query->set('meta_query', $meta_query);
+            }
+            
+            // RAM filter
+            if (isset($_GET['filter_ram']) && !empty($_GET['filter_ram'])) {
+                $meta_query = $query->get('meta_query') ?: array();
+                $meta_query[] = array(
+                    'key' => 'ram',
+                    'value' => sanitize_text_field($_GET['filter_ram']),
+                    'compare' => '='
+                );
+                $query->set('meta_query', $meta_query);
+            }
+            
+            // Storage filter
+            if (isset($_GET['filter_storage']) && !empty($_GET['filter_storage'])) {
+                $meta_query = $query->get('meta_query') ?: array();
+                $meta_query[] = array(
+                    'key' => 'storage',
+                    'value' => sanitize_text_field($_GET['filter_storage']),
+                    'compare' => '='
+                );
+                $query->set('meta_query', $meta_query);
+            }
+            
+            // Price filter
+            if (isset($_GET['filter_price']) && !empty($_GET['filter_price'])) {
+                $price_range = explode('-', $_GET['filter_price']);
+                if (count($price_range) == 2) {
+                    $min_price = intval($price_range[0]) * 1000000;
+                    $max_price = intval($price_range[1]) * 1000000;
+                    
+                    $meta_query = $query->get('meta_query') ?: array();
+                    $meta_query[] = array(
+                        'key' => '_price',
+                        'value' => array($min_price, $max_price),
+                        'type' => 'NUMERIC',
+                        'compare' => 'BETWEEN'
+                    );
+                    $query->set('meta_query', $meta_query);
+                }
+            }
+        }
+    }
+}
+add_action('pre_get_posts', 'phonestore_handle_shop_filters');
+
+// Track user registration IP and login activity
+function phonestore_track_user_activity() {
+   // Track registration IP
+   add_action('user_register', function($user_id) {
+       update_user_meta($user_id, 'registration_ip', $_SERVER['REMOTE_ADDR']);
+       update_user_meta($user_id, 'registration_date', current_time('d/m/Y H:i:s'));
+   });
+   
+   // Track login activity
+   add_action('wp_login', function($user_login, $user) {
+       update_user_meta($user->ID, 'last_login', current_time('d/m/Y H:i:s'));
+       update_user_meta($user->ID, 'last_login_ip', $_SERVER['REMOTE_ADDR']);
+   }, 10, 2);
+}
+add_action('init', 'phonestore_track_user_activity');
+
+// Add custom user fields
+function phonestore_add_custom_user_fields($user) {
+   ?>
+   <h3>Thông tin bổ sung</h3>
+   <table class="form-table">
+       <tr>
+           <th><label for="birth_date">Ngày sinh</label></th>
+           <td>
+               <input type="date" name="birth_date" id="birth_date" value="<?php echo esc_attr(get_user_meta($user->ID, 'birth_date', true)); ?>" class="regular-text" />
+           </td>
+       </tr>
+       <tr>
+           <th><label for="gender">Giới tính</label></th>
+           <td>
+               <select name="gender" id="gender">
+                   <option value="">Chọn giới tính</option>
+                   <option value="Nam" <?php selected(get_user_meta($user->ID, 'gender', true), 'Nam'); ?>>Nam</option>
+                   <option value="Nữ" <?php selected(get_user_meta($user->ID, 'gender', true), 'Nữ'); ?>>Nữ</option>
+                   <option value="Khác" <?php selected(get_user_meta($user->ID, 'gender', true), 'Khác'); ?>>Khác</option>
+               </select>
+           </td>
+       </tr>
+   </table>
+   <?php
+}
+add_action('show_user_profile', 'phonestore_add_custom_user_fields');
+add_action('edit_user_profile', 'phonestore_add_custom_user_fields');
+
+// Save custom user fields
+function phonestore_save_custom_user_fields($user_id) {
+   if (!current_user_can('edit_user', $user_id)) {
+       return false;
+   }
+   
+   update_user_meta($user_id, 'birth_date', $_POST['birth_date']);
+   update_user_meta($user_id, 'gender', $_POST['gender']);
+}
+add_action('personal_options_update', 'phonestore_save_custom_user_fields');
+add_action('edit_user_profile_update', 'phonestore_save_custom_user_fields');
+
+// Add wishlist functionality
+function phonestore_add_to_wishlist() {
+   if (!wp_verify_nonce($_POST['nonce'], 'phonestore_nonce')) {
+       wp_die('Security check failed');
+   }
+   
+   if (!is_user_logged_in()) {
+       wp_send_json_error('Vui lòng đăng nhập để thêm vào wishlist');
+       return;
+   }
+   
+   $product_id = intval($_POST['product_id']);
+   $user_id = get_current_user_id();
+   
+   $wishlist = get_user_meta($user_id, '_wishlist', true) ?: array();
+   
+   if (!in_array($product_id, $wishlist)) {
+       $wishlist[] = $product_id;
+       update_user_meta($user_id, '_wishlist', $wishlist);
+       wp_send_json_success('Đã thêm vào wishlist');
+   } else {
+       wp_send_json_error('Sản phẩm đã có trong wishlist');
+   }
+}
+add_action('wp_ajax_phonestore_add_to_wishlist', 'phonestore_add_to_wishlist');
+
+// Remove from wishlist
+function phonestore_remove_from_wishlist() {
+   if (!wp_verify_nonce($_POST['nonce'], 'phonestore_nonce')) {
+       wp_die('Security check failed');
+   }
+   
+   if (!is_user_logged_in()) {
+       wp_send_json_error('Vui lòng đăng nhập');
+       return;
+   }
+   
+   $product_id = intval($_POST['product_id']);
+   $user_id = get_current_user_id();
+   
+   $wishlist = get_user_meta($user_id, '_wishlist', true) ?: array();
+   $key = array_search($product_id, $wishlist);
+   
+   if ($key !== false) {
+       unset($wishlist[$key]);
+       update_user_meta($user_id, '_wishlist', array_values($wishlist));
+       wp_send_json_success('Đã xóa khỏi wishlist');
+   } else {
+       wp_send_json_error('Sản phẩm không có trong wishlist');
+   }
+}
+add_action('wp_ajax_phonestore_remove_from_wishlist', 'phonestore_remove_from_wishlist');
+
+// Custom dashboard widget for admin
+function phonestore_add_dashboard_widgets() {
+   wp_add_dashboard_widget(
+       'phonestore_stats',
+       'Thống kê cửa hàng',
+       'phonestore_dashboard_widget_function'
+   );
+}
+add_action('wp_dashboard_setup', 'phonestore_add_dashboard_widgets');
+
+function phonestore_dashboard_widget_function() {
+   // Get statistics
+   $total_users = count_users();
+   $total_orders = wp_count_posts('shop_order');
+   $total_products = wp_count_posts('product');
+   
+   echo '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; text-align: center;">';
+   
+   echo '<div style="background: #f0f9ff; padding: 15px; border-radius: 8px; border-left: 4px solid #0ea5e9;">';
+   echo '<h3 style="margin: 0; color: #0ea5e9;">' . $total_users['total_users'] . '</h3>';
+   echo '<p style="margin: 5px 0 0 0; font-size: 12px;">Khách hàng</p>';
+   echo '</div>';
+   
+   echo '<div style="background: #f0fdf4; padding: 15px; border-radius: 8px; border-left: 4px solid #22c55e;">';
+   echo '<h3 style="margin: 0; color: #22c55e;">' . ($total_orders->publish ?? 0) . '</h3>';
+   echo '<p style="margin: 5px 0 0 0; font-size: 12px;">Đơn hàng</p>';
+   echo '</div>';
+   
+   echo '<div style="background: #fefce8; padding: 15px; border-radius: 8px; border-left: 4px solid #eab308;">';
+   echo '<h3 style="margin: 0; color: #eab308;">' . ($total_products->publish ?? 0) . '</h3>';
+   echo '<p style="margin: 5px 0 0 0; font-size: 12px;">Sản phẩm</p>';
+   echo '</div>';
+   
+   echo '</div>';
+   
+   // Recent activity
+   echo '<h4 style="margin: 20px 0 10px 0;">Hoạt động gần đây:</h4>';
+   
+   $recent_users = get_users(array(
+       'number' => 5,
+       'orderby' => 'registered',
+       'order' => 'DESC'
+   ));
+   
+   if ($recent_users) {
+       echo '<ul style="margin: 0; padding-left: 20px;">';
+       foreach ($recent_users as $user) {
+           echo '<li style="margin-bottom: 5px; font-size: 13px;">';
+           echo '<strong>' . $user->display_name . '</strong> đã đăng ký ';
+           echo human_time_diff(strtotime($user->user_registered)) . ' trước';
+           echo '</li>';
+       }
+       echo '</ul>';
+   } else {
+       echo '<p style="font-style: italic; color: #666;">Chưa có hoạt động nào.</p>';
+   }
+}
+
+// Add account menu item to admin bar
+function phonestore_admin_bar_account_menu($wp_admin_bar) {
+   if (is_user_logged_in() && !is_admin()) {
+       $wp_admin_bar->add_node(array(
+           'id' => 'phonestore-account',
+           'title' => '👤 Tài khoản',
+           'href' => wc_get_account_endpoint_url('dashboard'),
+       ));
+       
+       $wp_admin_bar->add_node(array(
+           'id' => 'phonestore-orders',
+           'parent' => 'phonestore-account',
+           'title' => 'Đơn hàng của tôi',
+           'href' => wc_get_account_endpoint_url('orders'),
+       ));
+       
+       $wp_admin_bar->add_node(array(
+           'id' => 'phonestore-account-details',
+           'parent' => 'phonestore-account',
+           'title' => 'Thông tin tài khoản',
+           'href' => wc_get_account_endpoint_url('edit-account'),
+       ));
+       
+       $wp_admin_bar->add_node(array(
+           'id' => 'phonestore-logout',
+           'parent' => 'phonestore-account',
+           'title' => 'Đăng xuất',
+           'href' => wp_logout_url(home_url()),
+       ));
+   }
+}
+add_action('admin_bar_menu', 'phonestore_admin_bar_account_menu', 100);
+
+// Customize WooCommerce account menu
+function phonestore_custom_my_account_menu_items($items) {
+   // Reorder menu items
+   $new_items = array();
+   $new_items['dashboard'] = 'Tổng quan';
+   $new_items['orders'] = 'Đơn hàng';
+   $new_items['downloads'] = 'Tải xuống';
+   $new_items['edit-address'] = 'Địa chỉ';
+   $new_items['edit-account'] = 'Chi tiết tài khoản';
+   $new_items['customer-logout'] = 'Đăng xuất';
+   
+   return $new_items;
+}
+add_filter('woocommerce_account_menu_items', 'phonestore_custom_my_account_menu_items');
+
+// Add custom CSS for WooCommerce pages
+function phonestore_woocommerce_custom_styles() {
+   if (is_account_page()) {
+       ?>
+       <style>
+       /* Hide default WooCommerce navigation on dashboard */
+       .woocommerce-account .woocommerce-MyAccount-navigation {
+           background: white;
+           border-radius: 10px;
+           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+           margin-bottom: 20px;
+       }
+       
+       .woocommerce-account .woocommerce-MyAccount-navigation ul {
+           list-style: none;
+           padding: 0;
+           margin: 0;
+       }
+       
+       .woocommerce-account .woocommerce-MyAccount-navigation ul li {
+           border-bottom: 1px solid #f1f5f9;
+       }
+       
+       .woocommerce-account .woocommerce-MyAccount-navigation ul li:last-child {
+           border-bottom: none;
+       }
+       
+       .woocommerce-account .woocommerce-MyAccount-navigation ul li a {
+           display: block;
+           padding: 15px 20px;
+           color: #4a5568;
+           text-decoration: none;
+           font-weight: 600;
+           transition: all 0.3s;
+       }
+       
+       .woocommerce-account .woocommerce-MyAccount-navigation ul li.is-active a,
+       .woocommerce-account .woocommerce-MyAccount-navigation ul li a:hover {
+           background: #e6fffa;
+           color: #234e52;
+           transform: translateX(5px);
+       }
+       
+       .woocommerce-account .woocommerce-MyAccount-content {
+           background: white;
+           border-radius: 10px;
+           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+           padding: 30px;
+       }
+       
+       /* Mobile responsive */
+       @media (max-width: 768px) {
+           .woocommerce-account .woocommerce-MyAccount-navigation ul {
+               display: flex;
+               overflow-x: auto;
+               white-space: nowrap;
+           }
+           
+           .woocommerce-account .woocommerce-MyAccount-navigation ul li {
+               border-bottom: none;
+               border-right: 1px solid #f1f5f9;
+               flex-shrink: 0;
+           }
+           
+           .woocommerce-account .woocommerce-MyAccount-navigation ul li:last-child {
+               border-right: none;
+           }
+           
+           .woocommerce-account .woocommerce-MyAccount-navigation ul li a {
+               padding: 15px;
+               font-size: 14px;
+           }
+       }
+       </style>
+       <?php
+   }
+}
+add_action('wp_head', 'phonestore_woocommerce_custom_styles');
+
+// Custom My Account Page Title
+function phonestore_account_page_title() {
+    if (is_account_page() && is_user_logged_in()) {
+        $current_user = wp_get_current_user();
+        echo '<div class="account-page-header">';
+        echo '<h1>👤 Tài Khoản Của Tôi</h1>';
+        echo '<p>Xin chào <strong>' . $current_user->display_name . '</strong>, quản lý thông tin tài khoản và đơn hàng của bạn</p>';
+        echo '</div>';
+    }
+}
+add_action('woocommerce_account_dashboard', 'phonestore_account_page_title', 5);
+
+// Override WooCommerce account navigation
+function phonestore_account_navigation_styles() {
+    if (is_account_page()) {
+        ?>
+        <style>
+        .woocommerce-account .woocommerce-MyAccount-navigation {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        
+        .woocommerce-account .woocommerce-MyAccount-navigation ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-wrap: wrap;
+        }
+        
+        .woocommerce-account .woocommerce-MyAccount-navigation ul li {
+            flex: 1;
+            min-width: 150px;
+            border-right: 1px solid #f1f5f9;
+        }
+        
+        .woocommerce-account .woocommerce-MyAccount-navigation ul li:last-child {
+            border-right: none;
+        }
+        
+        .woocommerce-account .woocommerce-MyAccount-navigation ul li a {
+            display: block;
+            padding: 20px 15px;
+            color: #4a5568;
+            text-decoration: none;
+            font-weight: 600;
+           transition: all 0.3s;
+           text-align: center;
+           font-size: 14px;
+       }
+       
+       .woocommerce-account .woocommerce-MyAccount-navigation ul li.is-active a,
+       .woocommerce-account .woocommerce-MyAccount-navigation ul li a:hover {
+           background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+           color: white;
+           transform: translateY(-2px);
+       }
+       
+       .woocommerce-account .woocommerce-MyAccount-content {
+           background: white;
+           border-radius: 15px;
+           box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+           padding: 0;
+           overflow: hidden;
+       }
+       
+       /* Account Page Header */
+       .account-page-header {
+           text-align: center;
+           padding: 40px 0;
+           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+           color: white;
+           border-radius: 15px;
+           margin: 20px 0 30px 0;
+       }
+       
+       .account-page-header h1 {
+           font-size: 2.5rem;
+           margin-bottom: 10px;
+           font-weight: 800;
+       }
+       
+       .account-page-header p {
+           font-size: 1.2rem;
+           opacity: 0.9;
+           margin: 0;
+       }
+       
+       /* Mobile responsive */
+       @media (max-width: 768px) {
+           .woocommerce-account .woocommerce-MyAccount-navigation ul {
+               flex-direction: column;
+           }
+           
+           .woocommerce-account .woocommerce-MyAccount-navigation ul li {
+               border-right: none;
+               border-bottom: 1px solid #f1f5f9;
+           }
+           
+           .woocommerce-account .woocommerce-MyAccount-navigation ul li:last-child {
+               border-bottom: none;
+           }
+           
+           .account-page-header h1 {
+               font-size: 2rem;
+           }
+           
+           .account-page-header {
+               padding: 30px 20px;
+           }
+       }
+       </style>
+       <?php
+   }
+}
+add_action('wp_head', 'phonestore_account_navigation_styles');
+
+// Remove default dashboard content
+remove_action('woocommerce_account_dashboard', 'woocommerce_account_dashboard', 10);
+
+// Customize account menu items with icons
+function phonestore_account_menu_items($items) {
+   $new_items = array();
+   $new_items['dashboard'] = '🏠 Tổng quan';
+   $new_items['orders'] = '📦 Đơn hàng';
+   $new_items['downloads'] = '⬇️ Tải xuống';
+   $new_items['edit-address'] = '🏠 Địa chỉ';
+   $new_items['edit-account'] = '👤 Tài khoản';
+   $new_items['customer-logout'] = '🚪 Đăng xuất';
+   
+   return $new_items;
+}
+add_filter('woocommerce_account_menu_items', 'phonestore_account_menu_items');
 ?>
