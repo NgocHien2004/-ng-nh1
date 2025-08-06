@@ -110,7 +110,7 @@ Cập nhật header với navigation đầy đủ
             <a href="<?php echo wc_get_cart_url(); ?>" class="cart-link">
                 🛒 Giỏ hàng (<?php echo WC()->cart->get_cart_contents_count(); ?>)
             </a>
-            <a href="<?php echo wc_get_account_endpoint_url('dashboard'); ?>" class="account-link">
+            <a href="<?php echo wc_get_page_permalink('myaccount'); ?>" class="account-link">
                 👤 Tài khoản
             </a>
             <?php endif; ?>

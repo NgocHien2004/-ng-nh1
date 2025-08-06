@@ -2213,4 +2213,339 @@ function phonestore_account_menu_items($items) {
    return $new_items;
 }
 add_filter('woocommerce_account_menu_items', 'phonestore_account_menu_items');
+
+// Force WooCommerce account page to work properly
+function phonestore_fix_account_page() {
+    // Remove default WooCommerce dashboard content
+    remove_action( 'woocommerce_account_dashboard', 'woocommerce_account_dashboard', 10 );
+    
+    // Add our custom dashboard content
+    add_action( 'woocommerce_account_dashboard', 'phonestore_custom_account_dashboard', 10 );
+}
+add_action( 'init', 'phonestore_fix_account_page' );
+
+// Custom account dashboard content
+function phonestore_custom_account_dashboard() {
+    // Include our custom dashboard template
+    $template_path = get_template_directory() . '/woocommerce/myaccount/dashboard.php';
+    if ( file_exists( $template_path ) ) {
+        include $template_path;
+    }
+}
+
+// Ensure WooCommerce account endpoints work
+function phonestore_setup_account_endpoints() {
+    // Make sure account page exists
+    if ( ! get_option( 'woocommerce_myaccount_page_id' ) ) {
+        $account_page = get_page_by_path( 'my-account' );
+        if ( ! $account_page ) {
+            // Create account page if it doesn't exist
+            $account_page_id = wp_insert_post( array(
+                'post_title'   => 'My Account',
+                'post_name'    => 'my-account',
+                'post_content' => '[woocommerce_my_account]',
+                'post_status'  => 'publish',
+                'post_type'    => 'page'
+            ) );
+            
+            if ( $account_page_id ) {
+                update_option( 'woocommerce_myaccount_page_id', $account_page_id );
+            }
+        } else {
+            update_option( 'woocommerce_myaccount_page_id', $account_page->ID );
+        }
+    }
+}
+add_action( 'after_switch_theme', 'phonestore_setup_account_endpoints' );
+
+// Fix account page template
+function phonestore_account_page_template( $template ) {
+    if ( is_account_page() ) {
+        $account_template = get_template_directory() . '/woocommerce/myaccount/my-account.php';
+        if ( file_exists( $account_template ) ) {
+            return $account_template;
+        }
+    }
+    return $template;
+}
+add_filter( 'template_include', 'phonestore_account_page_template', 99 );
+
+// Customize WooCommerce account menu items with proper icons
+function phonestore_account_menu_items_fixed( $items ) {
+    $new_items = array();
+    $new_items['dashboard'] = '🏠 Tổng quan';
+    $new_items['orders'] = '📦 Đơn hàng';
+    
+    // Only show downloads if there are downloadable products
+    if ( wc_get_customer_download_permissions( get_current_user_id() ) ) {
+        $new_items['downloads'] = '⬇️ Tải xuống';
+    }
+    
+    $new_items['edit-address'] = '🏠 Địa chỉ';
+    $new_items['edit-account'] = '👤 Tài khoản';
+    $new_items['customer-logout'] = '🚪 Đăng xuất';
+    
+    return $new_items;
+}
+add_filter( 'woocommerce_account_menu_items', 'phonestore_account_menu_items_fixed', 99 );
+
+// Ensure account page redirects work properly
+function phonestore_fix_account_redirects() {
+    if ( is_admin() || ! is_account_page() ) {
+        return;
+    }
+    
+    // If user is not logged in and trying to access account endpoints, redirect to login
+    if ( ! is_user_logged_in() && ! is_wc_endpoint_url( 'lost-password' ) ) {
+        $current_url = wc_get_account_endpoint_url( 'dashboard' );
+        if ( ! is_wc_endpoint_url( 'lost-password' ) && ! is_wc_endpoint_url( 'register' ) ) {
+            wp_redirect( wc_get_account_endpoint_url( 'dashboard' ) );
+            exit;
+        }
+    }
+}
+add_action( 'template_redirect', 'phonestore_fix_account_redirects' );
+
+// Add account styles
+function phonestore_account_styles() {
+    if ( is_account_page() ) {
+        wp_add_inline_style( 'phonestore-style', '
+        .woocommerce-account {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .woocommerce-MyAccount-navigation {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        
+        .woocommerce-MyAccount-navigation ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-wrap: wrap;
+        }
+        
+        .woocommerce-MyAccount-navigation ul li {
+            flex: 1;
+            min-width: 150px;
+            border-right: 1px solid #f1f5f9;
+        }
+        
+        .woocommerce-MyAccount-navigation ul li:last-child {
+            border-right: none;
+        }
+        
+        .woocommerce-MyAccount-navigation ul li a {
+            display: block;
+            padding: 20px 15px;
+            color: #4a5568;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .woocommerce-MyAccount-navigation ul li.is-active a,
+        .woocommerce-MyAccount-navigation ul li a:hover {
+            background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .woocommerce-MyAccount-content {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        @media (max-width: 768px) {
+            .woocommerce-MyAccount-navigation ul {
+                flex-direction: column;
+            }
+            
+            .woocommerce-MyAccount-navigation ul li {
+                border-right: none;
+                border-bottom: 1px solid #f1f5f9;
+            }
+            
+            .woocommerce-MyAccount-navigation ul li:last-child {
+                border-bottom: none;
+            }
+        }
+        ');
+    }
+}
+add_action( 'wp_enqueue_scripts', 'phonestore_account_styles' );
+
+// Remove old account functions if they exist
+remove_action( 'init', 'phonestore_fix_account_page' );
+remove_filter( 'template_include', 'phonestore_account_page_template', 99 );
+
+// New improved account page handling
+function phonestore_setup_account_page() {
+    // Make sure WooCommerce account page exists
+    if ( class_exists( 'WooCommerce' ) ) {
+        $account_page_id = get_option( 'woocommerce_myaccount_page_id' );
+        
+        if ( ! $account_page_id || ! get_post( $account_page_id ) ) {
+            // Try to find existing my-account page
+            $account_page = get_page_by_path( 'my-account' );
+            
+            if ( ! $account_page ) {
+                // Create new account page
+                $account_page_id = wp_insert_post( array(
+                    'post_title'   => 'My Account',
+                    'post_name'    => 'my-account',
+                    'post_content' => '[woocommerce_my_account]',
+                    'post_status'  => 'publish',
+                    'post_type'    => 'page'
+                ) );
+            } else {
+                $account_page_id = $account_page->ID;
+            }
+            
+            if ( $account_page_id ) {
+                update_option( 'woocommerce_myaccount_page_id', $account_page_id );
+            }
+        }
+    }
+}
+add_action( 'after_switch_theme', 'phonestore_setup_account_page' );
+
+// Force correct template for account page
+function phonestore_account_template_include( $template ) {
+    if ( is_account_page() ) {
+        // Check if we have custom my-account template
+        $custom_template = get_template_directory() . '/woocommerce/myaccount/my-account.php';
+        if ( file_exists( $custom_template ) ) {
+            return $custom_template;
+        }
+    }
+    return $template;
+}
+add_filter( 'template_include', 'phonestore_account_template_include', 99 );
+
+// Ensure WooCommerce templates work with our theme
+function phonestore_woocommerce_template_path( $template, $template_name, $template_path ) {
+    if ( $template_name === 'myaccount/my-account.php' ) {
+        $custom_template = get_template_directory() . '/woocommerce/myaccount/my-account.php';
+        if ( file_exists( $custom_template ) ) {
+            return $custom_template;
+        }
+    }
+    return $template;
+}
+add_filter( 'woocommerce_locate_template', 'phonestore_woocommerce_template_path', 10, 3 );
+
+// Fix account page body class
+function phonestore_account_body_class( $classes ) {
+    if ( is_account_page() ) {
+        $classes[] = 'woocommerce-account';
+        $classes[] = 'phonestore-account-page';
+    }
+    return $classes;
+}
+add_filter( 'body_class', 'phonestore_account_body_class' );
+
+// Customize account menu items
+function phonestore_account_menu_items_with_icons( $items ) {
+    $new_items = array();
+    $new_items['dashboard'] = '🏠 Tổng quan';
+    $new_items['orders'] = '📦 Đơn hàng';
+    
+    // Only add downloads if there are any
+    if ( wc_get_customer_download_permissions( get_current_user_id() ) ) {
+        $new_items['downloads'] = '⬇️ Tải xuống';
+    }
+    
+    $new_items['edit-address'] = '🏠 Địa chỉ';
+    $new_items['edit-account'] = '👤 Tài khoản';
+    $new_items['customer-logout'] = '🚪 Đăng xuất';
+    
+    return $new_items;
+}
+add_filter( 'woocommerce_account_menu_items', 'phonestore_account_menu_items_with_icons', 20 );
+
+// Add account page specific styles
+function phonestore_account_page_styles() {
+    if ( is_account_page() ) {
+        wp_add_inline_style( 'phonestore-style', '
+        body.phonestore-account-page {
+            background: #f8fafc;
+        }
+        
+        .phonestore-account-page .site-header {
+            position: relative;
+        }
+        
+        .woocommerce-account {
+            margin: 0;
+            padding: 0;
+        }
+        
+        .woocommerce-notices-wrapper {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .woocommerce-message,
+        .woocommerce-error,
+        .woocommerce-info {
+            background: white;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .woocommerce-message {
+            border-left: 4px solid #38a169;
+            color: #2f855a;
+        }
+        
+        .woocommerce-error {
+            border-left: 4px solid #e53e3e;
+            color: #c53030;
+        }
+        
+        .woocommerce-info {
+            border-left: 4px solid #4299e1;
+            color: #3182ce;
+        }
+        ' );
+    }
+}
+add_action( 'wp_enqueue_scripts', 'phonestore_account_page_styles' );
+
+// Ensure account endpoints work properly
+function phonestore_flush_rewrite_rules_on_activation() {
+    // Flush rewrite rules to ensure account endpoints work
+    flush_rewrite_rules();
+}
+add_action( 'after_switch_theme', 'phonestore_flush_rewrite_rules_on_activation' );
+
+// Fix account page redirects
+function phonestore_account_redirect_fix() {
+    if ( is_account_page() && ! is_user_logged_in() ) {
+        // Allow access to login/register pages
+        global $wp;
+        $current_endpoint = isset( $wp->query_vars ) ? key( $wp->query_vars ) : '';
+        
+        if ( ! in_array( $current_endpoint, array( 'lost-password', 'register' ) ) && ! empty( $current_endpoint ) ) {
+            wp_redirect( wc_get_page_permalink( 'myaccount' ) );
+            exit;
+        }
+    }
+}
+add_action( 'template_redirect', 'phonestore_account_redirect_fix' );
 ?>
