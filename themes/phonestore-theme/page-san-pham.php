@@ -990,3 +990,24 @@ jQuery(document).ready(function($) {
 </style>
 
 <?php get_footer(); ?>
+
+<?php
+// Lấy danh sách sản phẩm
+$products = wc_get_products(['status' => 'publish']);
+
+foreach ($products as $product) :
+    $product_url = get_permalink($product->get_id());
+?>
+    <div class="product-card">
+        <a href="<?php echo $product_url; ?>">
+            <?php echo $product->get_image('medium'); ?>
+            <h3><?php echo $product->get_name(); ?></h3>
+            <div class="price"><?php echo $product->get_price_html(); ?></div>
+        </a>
+        
+        <!-- Nút xem chi tiết -->
+        <a href="<?php echo $product_url; ?>" class="btn-detail">
+            👁️ Xem chi tiết
+        </a>
+    </div>
+<?php endforeach; ?>
