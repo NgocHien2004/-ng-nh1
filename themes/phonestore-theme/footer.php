@@ -109,6 +109,7 @@
         gap: 20px;
     }
 }
+
 </style>
 
 <?php wp_footer(); ?>

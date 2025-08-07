@@ -2269,6 +2269,23 @@ get_header(); ?>
    }
 }
 
+body {
+    margin: 0;
+    padding: 0;
+}
+
+.site-footer {
+    margin: 0;
+    padding: 40px 0 20px;
+    width: 100vw; /* viewport width - chiếm hết màn hình */
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+}
+
+
 </style>
 
 <script>
@@ -2596,5 +2613,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-
 <?php get_footer(); ?>

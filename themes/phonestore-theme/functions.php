@@ -2823,4 +2823,30 @@ function phonestore_get_all_product_attributes($product_id) {
     
     return $attributes;
 }
+
+// Fix footer cho single product page
+function phonestore_single_product_footer_fix() {
+    if (is_product()) {
+        ?>
+        <style>
+        body.single-product .site-footer {
+            width: 100vw !important;
+            position: relative !important;
+            left: 50% !important;
+            right: 50% !important;
+            margin-left: -50vw !important;
+            margin-right: -50vw !important;
+            margin-top: 50px !important;
+            margin-bottom: 0 !important;
+        }
+        
+        body.single-product .footer-container {
+            max-width: none !important;
+            margin: 0 !important;
+        }
+        </style>
+        <?php
+    }
+}
+add_action('wp_head', 'phonestore_single_product_footer_fix');
 ?>

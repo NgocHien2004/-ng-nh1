@@ -107,3 +107,14 @@ Version: 1.0
     max-height: 2000px;
   }
 }
+
+.site-footer {
+  margin: 0 !important;
+  width: 100% !important;
+  display: block !important;
+}
+
+.footer-container {
+  max-width: none !important;
+  margin: 0 !important;
+}
