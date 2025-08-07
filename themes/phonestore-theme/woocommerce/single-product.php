@@ -293,67 +293,7 @@ get_header(); ?>
         </div>
     </div>
 </div>
-                    
-                    <!-- Product Actions -->
-                    <div class="product-actions">
-                        <div class="quantity-selector">
-                            <label>Số lượng:</label>
-                            <div class="quantity-input">
-                                <button type="button" class="qty-btn minus">-</button>
-                                <input type="number" name="quantity" value="1" min="1" max="10">
-                                <button type="button" class="qty-btn plus">+</button>
-                            </div>
-                        </div>
-                        
-                        <div class="action-buttons">
-                            <button class="add-to-cart-btn" data-product-id="<?php echo $product_id; ?>">
-                                🛒 Thêm vào giỏ hàng
-                            </button>
-                            <button class="buy-now-btn" data-product-id="<?php echo $product_id; ?>">
-                                ⚡ Mua ngay
-                            </button>
-                            <button class="compare-btn" data-product-id="<?php echo $product_id; ?>">
-                                ⚖️ So sánh
-                            </button>
-                            <button class="wishlist-btn" data-product-id="<?php echo $product_id; ?>">
-                                ❤️ Yêu thích
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Additional Info -->
-                    <div class="additional-info">
-                        <div class="info-item">
-                            <span class="icon">🚚</span>
-                            <div class="info-text">
-                                <strong>Miễn phí giao hàng</strong>
-                                <small>Giao hàng miễn phí trong nội thành</small>
-                            </div>
-                        </div>
-                        <div class="info-item">
-                            <span class="icon">🔄</span>
-                            <div class="info-text">
-                                <strong>Đổi trả 7 ngày</strong>
-                                <small>Miễn phí đổi trả trong 7 ngày</small>
-                            </div>
-                        </div>
-                        <div class="info-item">
-                            <span class="icon">🛡️</span>
-                            <div class="info-text">
-                                <strong>Bảo hành chính hãng</strong>
-                                <small>Bảo hành 12 tháng</small>
-                            </div>
-                        </div>
-                        <div class="info-item">
-                            <span class="icon">💬</span>
-                            <div class="info-text">
-                                <strong>Hỗ trợ 24/7</strong>
-                                <small>Tư vấn mua hàng miễn phí</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
             
             <!-- Product Description -->
             <div class="product-description">
