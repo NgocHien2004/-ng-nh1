@@ -95,35 +95,6 @@ defined( 'ABSPATH' ) || exit;
 
 	</table>
 
-	<!-- Custom Proceed to Checkout Form -->
-	<div class="wc-proceed-to-checkout">
-		<?php if (is_user_logged_in()): ?>
-			<form method="post" class="checkout-form-with-invoice">
-				<?php wp_nonce_field('proceed_to_checkout', 'checkout_nonce'); ?>
-   			<input type="hidden" name="proceed_to_checkout" value="1">
-   			
-   			<button type="submit" name="checkout-button" class="checkout-button alt wc-forward">
-   				<span class="checkout-text">📧 Gửi hóa đơn & Thanh toán</span>
-   				<span class="checkout-loading" style="display: none;">⏳ Đang gửi...</span>
-   			</button>
-   			
-   			<div class="checkout-notice">
-   				<small>✅ Hóa đơn sẽ được gửi đến email của bạn trước khi thanh toán</small>
-   			</div>
-   		</form>
-   	<?php else: ?>
-   		<div class="login-required-notice">
-   			<p>🔐 <strong>Vui lòng đăng nhập để tiếp tục</strong></p>
-   			<a href="<?php echo wp_login_url(wc_get_cart_url()); ?>" class="button login-button">
-   				👤 Đăng nhập
-   			</a>
-   			<a href="<?php echo wp_registration_url(); ?>" class="button register-button">
-   				📝 Đăng ký
-   			</a>
-   		</div>
-   	<?php endif; ?>
-   </div>
-
    <!-- User Info Display -->
    <?php if (is_user_logged_in()): 
    	$user = wp_get_current_user();

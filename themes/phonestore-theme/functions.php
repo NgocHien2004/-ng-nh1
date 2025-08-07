@@ -1100,6 +1100,7 @@ function phonestore_send_invoice_email($billing_info, $cart, $invoice_number) {
 }
 
 // Build customer invoice email content
+// Build customer invoice email content
 function phonestore_build_invoice_email_content($billing_info, $cart, $invoice_number, $full_name, $full_address) {
     $site_name = get_bloginfo('name');
     $currency_symbol = get_woocommerce_currency_symbol();
@@ -1215,77 +1216,45 @@ function phonestore_build_invoice_email_content($billing_info, $cart, $invoice_n
             }
             .text-right { text-align: right; }
             .text-center { text-align: center; }
-            .total-row {
-                background: #28a745 !important;
-                color: white !important;
+            .subtotal-row { background: #f1f3f4; }
+            .total-row { 
+                background: #667eea; 
+                color: white; 
                 font-weight: bold;
             }
-            .total-row td {
-                border-bottom: none !important;
-                font-size: 18px;
+            .total-row td { 
+                font-size: 18px; 
                 padding: 20px 15px;
             }
-            .subtotal-row {
-                background: #17a2b8 !important;
-                color: white !important;
-                font-weight: 600;
-            }
-            .notes {
-                background: #fff3cd;
-                border: 1px solid #ffeaa7;
-                padding: 20px;
-                border-radius: 8px;
-                margin: 25px 0;
-            }
-            .notes h4 {
-                color: #856404;
-                margin-top: 0;
-            }
-            .footer { 
-                background: #495057; 
-                color: white; 
-                padding: 30px; 
-                text-align: center;
-            }
-            .footer h4 {
-                margin-top: 0;
-                color: #fff;
-            }
-            .contact-info {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 20px;
-                margin-top: 20px;
-            }
-            .contact-item {
+            .footer {
+                background: #2c3e50;
+                color: white;
+                padding: 30px;
                 text-align: center;
             }
             .next-steps {
-                background: #d4edda;
-                border: 1px solid #c3e6cb;
-                padding: 25px;
+                background: #fff3cd;
+                border: 1px solid #ffeaa7;
                 border-radius: 8px;
-                margin: 25px 0;
+                padding: 20px;
+                margin: 20px 0;
             }
             .next-steps h4 {
-                color: #155724;
+                color: #856404;
                 margin-top: 0;
             }
             .next-steps ol {
-                color: #155724;
+                color: #856404;
+                margin: 0;
                 padding-left: 20px;
             }
-            .next-steps li {
-                margin-bottom: 8px;
-            }
             @media (max-width: 600px) {
-                .container { margin: 10px; }
+                .container { margin: 0; border-radius: 0; }
                 .content { padding: 20px; }
-                .header { padding: 30px 20px; }
-                .items-table { font-size: 14px; }
-                .items-table th, .items-table td { padding: 10px 8px; }
                 .info-row { flex-direction: column; }
                 .info-value { text-align: left; margin-top: 5px; }
+                .items-table { font-size: 14px; }
+                .items-table th, .items-table td { padding: 10px 8px; }
             }
         </style>
     </head>
@@ -1384,24 +1353,12 @@ function phonestore_build_invoice_email_content($billing_info, $cart, $invoice_n
                             <td class="text-right"><strong><?php echo wc_price($cart->get_cart_contents_total()); ?></strong></td>
                         </tr>
                         
-                        <?php if ($cart->get_shipping_total() > 0): ?>
+                        <?php 
+                        $fee_total = $cart->get_fee_total();
+                        if ($fee_total > 0): ?>
                         <tr>
                             <td colspan="2">🚚 Phí vận chuyển</td>
-                            <td class="text-right"><?php echo wc_price($cart->get_shipping_total()); ?></td>
-                        </tr>
-                        <?php endif; ?>
-                        
-                        <?php if ($cart->get_fee_total() > 0): ?>
-                        <tr>
-                            <td colspan="2">📋 Phí khác</td>
-                            <td class="text-right"><?php echo wc_price($cart->get_fee_total()); ?></td>
-                        </tr>
-                        <?php endif; ?>
-                        
-                        <?php if ($cart->get_discount_total() > 0): ?>
-                        <tr style="background: #f8d7da;">
-                            <td colspan="2">🎟️ Giảm giá</td>
-                            <td class="text-right">-<?php echo wc_price($cart->get_discount_total()); ?></td>
+                            <td class="text-right"><?php echo wc_price($fee_total); ?></td>
                         </tr>
                         <?php endif; ?>
                         
@@ -1422,43 +1379,29 @@ function phonestore_build_invoice_email_content($billing_info, $cart, $invoice_n
                     </ol>
                 </div>
 
-                <div class="notes">
-                    <h4>📝 Lưu ý quan trọng:</h4>
-                    <ul>
-                        <li>Đây là <strong>hóa đơn tạm thời</strong>, chưa phải hóa đơn chính thức</li>
-                        <li>Vui lòng <strong>giữ lại email này</strong> để đối chiếu khi nhận hàng</li>
-                        <li>Nếu có thắc mắc, vui lòng liên hệ hotline: <strong>0123.456.789</strong></li>
-                        <li>Hóa đơn VAT sẽ được xuất sau khi hoàn tất thanh toán</li>
+                <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h4 style="color: #2d5016; margin-top: 0;">📝 Lưu ý quan trọng:</h4>
+                    <ul style="color: #2d5016; margin: 0; padding-left: 20px;">
+                        <li>Đây là hóa đơn tạm thời, chưa phải hóa đơn chính thức</li>
+                        <li>Vui lòng giữ lại email này để theo dõi đơn hàng</li>
+                        <li>Mọi thắc mắc vui lòng liên hệ hotline: 0123.456.789</li>
+                        <li>Sản phẩm có thể thay đổi tùy theo tình trạng kho</li>
                     </ul>
                 </div>
             </div>
             
             <div class="footer">
-                <h4>📞 Thông tin liên hệ</h4>
-                <div class="contact-info">
-                    <div class="contact-item">
-                        <strong>📍 Địa chỉ</strong><br>
-                        Purple House, Ninh Kiều<br>
-                        Cần Thơ, Việt Nam
-                    </div>
-                    <div class="contact-item">
-                        <strong>📱 Hotline</strong><br>
-                        0123.456.789<br>
-                        098.765.4321
-                    </div>
-                    <div class="contact-item">
-                        <strong>✉️ Email</strong><br>
-                        info@phonestore.com<br>
-                        support@phonestore.com
-                    </div>
-                    <div class="contact-item">
-                        <strong>🕐 Giờ làm việc</strong><br>
-                        T2-T6: 8:00-21:00<br>
-                        T7-CN: 8:00-22:00
-                    </div>
-                </div>
-                <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #6c757d;">
-                    <small>© <?php echo date('Y'); ?> <?php echo $site_name; ?>. Tất cả các quyền được bảo lưu.</small>
+                <h3>📞 Thông tin liên hệ</h3>
+                <p>
+                    <strong><?php echo $site_name; ?></strong><br>
+                    📍 Địa chỉ: Cái Răng, Cần Thơ, Việt Nam<br>
+                    📞 Hotline: 0123.456.789<br>
+                    📧 Email: info@<?php echo $_SERVER['HTTP_HOST']; ?><br>
+                    🌐 Website: <?php echo home_url(); ?>
+                </p>
+                <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">
+                    <small>© <?php echo date('Y'); ?> <?php echo $site_name; ?>. 
+                    Tất cả các quyền được bảo lưu.</small>
                 </p>
             </div>
         </div>
@@ -3053,5 +2996,36 @@ function phonestore_add_vietnam_shipping($methods) {
 
 add_action('woocommerce_shipping_init', 'phonestore_register_vietnam_shipping');
 add_filter('woocommerce_shipping_methods', 'phonestore_add_vietnam_shipping');
+
+// Add shipping fee to cart
+function phonestore_add_shipping_fee() {
+    if (is_admin() && !defined('DOING_AJAX')) return;
+    
+    // Only add fee in cart and checkout pages
+    if (!is_cart() && !is_checkout()) return;
+    
+    $shipping_fee = 25000; // 25,000 VNĐ phí ship cố định
+    
+    // Check if fee already exists
+    $fees = WC()->cart->get_fees();
+    foreach ($fees as $fee) {
+        if ($fee->name === 'Phí vận chuyển') {
+            return; // Fee already added
+        }
+    }
+    
+    // Add shipping fee
+    WC()->cart->add_fee('Phí vận chuyển', $shipping_fee);
+}
+add_action('woocommerce_cart_calculate_fees', 'phonestore_add_shipping_fee');
+
+// Display shipping fee with icon
+function phonestore_cart_fee_html($cart_fee_html, $fee) {
+    if ($fee->name === 'Phí vận chuyển') {
+        return '🚚 ' . $cart_fee_html;
+    }
+    return $cart_fee_html;
+}
+add_filter('woocommerce_cart_totals_fee_html', 'phonestore_cart_fee_html', 10, 2);
 
 ?>
