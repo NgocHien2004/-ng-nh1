@@ -4873,7 +4873,7 @@ add_action('wp_ajax_nopriv_update_shipping_type', 'phonestore_update_shipping_ty
 
 // ===== HỆ THỐNG SHIPPING MỚI - HOẠT ĐỘNG CHÍNH XÁC =====
 
-// Tính phí ship tự động theo dropdown
+// Tính phí ship - PHIÊN BẢN ĐỒNG BỘ VỚI DROPDOWN
 function phonestore_calculate_shipping_automatically() {
     if (is_admin() && !defined('DOING_AJAX')) return;
     if (!is_cart() && !is_checkout()) return;
@@ -4881,51 +4881,76 @@ function phonestore_calculate_shipping_automatically() {
     // Xóa tất cả fees trước
     WC()->cart->fees_api()->remove_all_fees();
     
-    // Lấy thông tin địa chỉ
     $province = '';
     $district = '';
     $shipping_type = 'economy';
     
-    // 1. Lấy từ POST data (khi user đang nhập form)
+    // CÁCH 1: Lấy từ WooCommerce checkout posted data
     if (isset($_POST['post_data'])) {
-        parse_str($_POST['post_data'], $post_data);
-        $province = $post_data['billing_state'] ?? '';
-        $district = $post_data['billing_city'] ?? '';
+        parse_str($_POST['post_data'], $checkout_data);
+        $province = $checkout_data['billing_state'] ?? '';
+        $district = $checkout_data['billing_city'] ?? '';
+        error_log("Method 1 - POST data: Province='{$province}', District='{$district}'");
     }
     
-    // 2. Fallback lấy từ customer
+    // CÁCH 2: Lấy trực tiếp từ $_POST  
+    if (empty($province)) {
+        $province = $_POST['billing_state'] ?? '';
+        $district = $_POST['billing_city'] ?? '';
+        error_log("Method 2 - Direct POST: Province='{$province}', District='{$district}'");
+    }
+    
+    // CÁCH 3: Lấy từ session đã lưu
+    if (empty($province)) {
+        $saved_address = WC()->session->get('temp_billing_address');
+        if ($saved_address) {
+            $province = $saved_address['state'];
+            $district = $saved_address['city'];
+            error_log("Method 3 - Session: Province='{$province}', District='{$district}'");
+        }
+    }
+    
+    // CÁCH 4: Lấy từ customer object
     if (empty($province) && WC()->customer) {
         $province = WC()->customer->get_billing_state();
         $district = WC()->customer->get_billing_city();
+        error_log("Method 4 - Customer: Province='{$province}', District='{$district}'");
     }
     
-    // 3. Lấy shipping type từ session
-    $selected_type = WC()->session->get('selected_shipping_type');
-    if ($selected_type) {
-        $shipping_type = $selected_type;
-    }
+    // Lấy shipping type
+    $shipping_type = WC()->session->get('selected_shipping_type', 'economy');
     
-    // Debug log
-    error_log("Shipping calc - Province: {$province}, District: {$district}, Type: {$shipping_type}");
+    error_log("Final shipping calculation: Province='{$province}', District='{$district}', Type='{$shipping_type}'");
     
-    // Tính phí nếu có đủ thông tin
-    if (!empty($province) && !empty($district)) {
+    // Chỉ tính phí khi có đủ thông tin và không rỗng
+    if (!empty($province) && !empty($district) && $province !== '' && $district !== '') {
         $shipping_fee = phonestore_get_shipping_fee_by_location($province, $district, $shipping_type);
+        $description = phonestore_get_shipping_description($province, $district, $shipping_type);
         
+        // Thêm phí vào cart
         if ($shipping_fee > 0) {
             WC()->cart->add_fee('Phí vận chuyển', $shipping_fee);
         }
         
-        // Lưu thông tin
+        // Lưu thông tin chi tiết
         WC()->session->set('current_shipping_info', array(
             'fee' => $shipping_fee,
             'province' => $province,
             'district' => $district,
             'type' => $shipping_type,
-            'description' => phonestore_get_shipping_description($province, $district, $shipping_type)
+            'description' => $description
         ));
         
-        error_log("Shipping fee: {$shipping_fee}");
+        error_log("Shipping SUCCESS: Fee={$shipping_fee}, Description='{$description}'");
+    } else {
+        error_log("Shipping FAILED: Missing address data");
+        WC()->session->set('current_shipping_info', array(
+            'fee' => 0,
+            'province' => $province,
+            'district' => $district,
+            'type' => $shipping_type,
+            'description' => 'Chưa chọn địa chỉ giao hàng'
+        ));
     }
 }
 add_action('woocommerce_cart_calculate_fees', 'phonestore_calculate_shipping_automatically');
@@ -4967,58 +4992,49 @@ function phonestore_get_shipping_description($province, $district, $type) {
     }
 }
 
-// Script update real-time khi chọn dropdown
+// JavaScript update shipping - ĐỒNG BỘ DROPDOWN
 function phonestore_realtime_shipping_update() {
     if (is_checkout()) {
         ?>
         <script type="text/javascript">
         jQuery(document).ready(function($) {
             var updateTimer;
-            
-            // Function trigger update checkout
-            function triggerShippingUpdate() {
-                clearTimeout(updateTimer);
-                updateTimer = setTimeout(function() {
-                    console.log('Triggering shipping update...');
-                    $('body').trigger('update_checkout');
-                }, 1000);
-            }
-            
-            // Lắng nghe thay đổi dropdown tỉnh/huyện  
-            $(document).on('change', '#billing_state, #billing_city', function() {
-                var province = $('#billing_state').val();
-                var district = $('#billing_city').val();
-                
-                console.log('Address changed - Province:', province, 'District:', district);
-                
-                if (province && district) {
-                    triggerShippingUpdate();
-                }
-            });
-            
-            // Lắng nghe thay đổi shipping type
-            $(document).on('change', 'input[name="shipping_type"]', function() {
-                var selectedType = $(this).val();
-                console.log('Shipping type changed:', selectedType);
-                
-                // Update qua AJAX
-                $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
-                    action: 'update_shipping_type', 
-                    shipping_type: selectedType,
-                    security: '<?php echo wp_create_nonce('shipping-type-nonce'); ?>'
-                }, function(response) {
-                    console.log('Shipping type updated, triggering checkout...');
-                    triggerShippingUpdate();
-                });
-            });
-            
-            // Update districts dropdown khi chọn tỉnh
             var provinces_data = <?php echo json_encode(get_vietnam_provinces_districts()); ?>;
             
+            // Force trigger update checkout với delay
+            function forceUpdateCheckout() {
+                clearTimeout(updateTimer);
+                updateTimer = setTimeout(function() {
+                    console.log('=== FORCE UPDATE CHECKOUT ===');
+                    
+                    var province = $('#billing_state').val();
+                    var district = $('#billing_city').val();
+                    
+                    console.log('Current values - Province:', province, 'District:', district);
+                    
+                    // Lưu trực tiếp vào form data để WooCommerce nhận được
+                    if (province && district) {
+                        // Trigger update checkout với form data đầy đủ
+                        var formData = $('#checkout').serialize();
+                        console.log('Form data being sent:', formData);
+                        
+                        $('body').trigger('update_checkout', [{
+                            post_data: formData
+                        }]);
+                    } else {
+                        $('body').trigger('update_checkout');
+                    }
+                }, 1200);
+            }
+            
+            // Update districts khi chọn tỉnh
             $(document).on('change', '#billing_state', function() {
                 var selectedProvince = $(this).val();
                 var $districtSelect = $('#billing_city');
                 
+                console.log('Province selected:', selectedProvince);
+                
+                // Clear và update districts
                 $districtSelect.empty().append('<option value="">Chọn Quận/Huyện</option>');
                 
                 if (selectedProvince && provinces_data[selectedProvince]) {
@@ -5027,18 +5043,54 @@ function phonestore_realtime_shipping_update() {
                         $districtSelect.append('<option value="' + district + '">' + district + '</option>');
                     });
                 }
+                
+                // Reset district value
+                $districtSelect.val('');
+                
+                // Không trigger update ngay, đợi user chọn district
             });
             
-            // Force update lần đầu nếu đã có địa chỉ
+            // Chỉ update shipping khi đã chọn cả tỉnh và huyện
+            $(document).on('change', '#billing_city', function() {
+                var province = $('#billing_state').val();
+                var district = $(this).val();
+                
+                console.log('District selected:', district);
+                console.log('Complete address:', province, '-', district);
+                
+                if (province && district && province !== '' && district !== '') {
+                    console.log('Both province and district selected, updating shipping...');
+                    forceUpdateCheckout();
+                } else {
+                    console.log('Incomplete address, skipping update');
+                }
+            });
+            
+            // Shipping type change
+            $(document).on('change', 'input[name="shipping_type"]', function() {
+                var selectedType = $(this).val();
+                console.log('Shipping type changed to:', selectedType);
+                
+                $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
+                    action: 'update_shipping_type',
+                    shipping_type: selectedType, 
+                    security: '<?php echo wp_create_nonce('shipping-type-nonce'); ?>'
+                }, function(response) {
+                    console.log('Shipping type saved, updating checkout...');
+                    forceUpdateCheckout();
+                });
+            });
+            
+            // Check và update lần đầu nếu có địa chỉ sẵn
             setTimeout(function() {
                 var province = $('#billing_state').val();
                 var district = $('#billing_city').val();
                 
-                if (province && district) {
-                    console.log('Initial address found, updating...');
-                    triggerShippingUpdate();
+                if (province && district && province !== '' && district !== '') {
+                    console.log('Initial complete address found, updating...');
+                    forceUpdateCheckout();
                 }
-            }, 1500);
+            }, 2000);
         });
         </script>
         <?php
@@ -5047,17 +5099,92 @@ function phonestore_realtime_shipping_update() {
 add_action('wp_footer', 'phonestore_realtime_shipping_update');
 
 // Debug function - chỉ hiển thị cho admin
+// Debug function - đơn giản hóa
 function phonestore_debug_shipping_calculation() {
     if (is_checkout() && current_user_can('administrator')) {
         $shipping_info = WC()->session->get('current_shipping_info');
         $selected_type = WC()->session->get('selected_shipping_type');
+        $temp_address = WC()->session->get('temp_billing_address');
         
         echo '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px 0; font-size: 12px;">';
         echo '<strong>🔧 DEBUG SHIPPING:</strong><br>';
-        echo 'Selected Type: ' . ($selected_type ?: 'none') . '<br>';
+        echo 'Selected Type: ' . ($selected_type ?: 'economy') . '<br>';
+        echo 'Temp Address: ' . print_r($temp_address, true) . '<br>';
         echo 'Shipping Info: ' . print_r($shipping_info, true);
         echo '</div>';
     }
 }
 add_action('woocommerce_checkout_before_order_review', 'phonestore_debug_shipping_calculation');
+
+// Lưu địa chỉ vào session khi checkout update
+function phonestore_save_address_on_update($post_data) {
+    if (!empty($post_data)) {
+        parse_str($post_data, $data);
+        
+        if (!empty($data['billing_state']) && !empty($data['billing_city'])) {
+            WC()->session->set('address_backup', array(
+                'province' => sanitize_text_field($data['billing_state']),
+                'district' => sanitize_text_field($data['billing_city'])
+            ));
+            
+            error_log("Address saved to session: " . $data['billing_state'] . " - " . $data['billing_city']);
+        }
+    }
+}
+add_action('woocommerce_checkout_update_order_review', 'phonestore_save_address_on_update');
+
+// AJAX handler lưu địa chỉ tạm thời
+function phonestore_save_temp_address() {
+    check_ajax_referer('temp-address-nonce', 'security');
+    
+    $province = sanitize_text_field($_POST['province']);
+    $district = sanitize_text_field($_POST['district']);
+    
+    // Lưu vào session
+    WC()->session->set('address_backup', array(
+        'province' => $province,
+        'district' => $district
+    ));
+    
+    // Cập nhật customer data luôn
+    if (WC()->customer) {
+        WC()->customer->set_billing_state($province);
+        WC()->customer->set_billing_city($district);
+        WC()->customer->save();
+    }
+    
+    error_log("Temp address saved: {$province} - {$district}");
+    
+    wp_send_json_success();
+}
+add_action('wp_ajax_save_temp_address', 'phonestore_save_temp_address');
+add_action('wp_ajax_nopriv_save_temp_address', 'phonestore_save_temp_address');
+
+// Lưu địa chỉ billing ngay khi có thay đổi từ checkout form
+function phonestore_save_billing_address_on_update($post_data) {
+    if (!empty($post_data)) {
+        parse_str($post_data, $data);
+        
+        $state = $data['billing_state'] ?? '';
+        $city = $data['billing_city'] ?? '';
+        
+        if (!empty($state) && !empty($city)) {
+            // Lưu vào session
+            WC()->session->set('temp_billing_address', array(
+                'state' => sanitize_text_field($state),
+                'city' => sanitize_text_field($city)
+            ));
+            
+            // Cập nhật customer object
+            if (WC()->customer) {
+                WC()->customer->set_billing_state($state);
+                WC()->customer->set_billing_city($city);
+            }
+            
+            error_log("Billing address updated: State='{$state}', City='{$city}'");
+        }
+    }
+}
+add_action('woocommerce_checkout_update_order_review', 'phonestore_save_billing_address_on_update', 5);
+
 ?>
