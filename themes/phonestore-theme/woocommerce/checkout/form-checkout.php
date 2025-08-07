@@ -456,6 +456,61 @@ if ( ! $checkout->is_registration_enabled() && $checkout->is_registration_requir
 	color: #2563eb;
 	border: 1px solid #bfdbfe;
 }
+
+/* Style cho 2 shipping options */
+.woocommerce-shipping-methods {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.woocommerce-shipping-methods li {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 0;
+    transition: all 0.3s ease;
+}
+
+.woocommerce-shipping-methods li:hover {
+    border-color: #667eea;
+    background: #f0f4ff;
+}
+
+.woocommerce-shipping-methods li input:checked + label {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.woocommerce-shipping-methods li label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+}
+
+/* Economy shipping style */
+.woocommerce-shipping-methods li:has(input[value*="economy"]) {
+    border-left: 4px solid #28a745;
+}
+
+.woocommerce-shipping-methods li:has(input[value*="economy"]:checked) {
+    background: #e8f5e8;
+    border-color: #28a745;
+}
+
+/* Express shipping style */
+.woocommerce-shipping-methods li:has(input[value*="express"]) {
+    border-left: 4px solid #ffc107;
+}
+
+.woocommerce-shipping-methods li:has(input[value*="express"]:checked) {
+    background: #fff8e1;
+    border-color: #ffc107;
+}
 </style>
 
 <script>

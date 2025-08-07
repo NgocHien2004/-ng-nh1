@@ -3,13 +3,18 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class Can_Tho_Distance_Shipping extends WC_Shipping_Method {
+class Simple_Shipping_Method extends WC_Shipping_Method {
+    
+    private $store_coordinates = array(
+        'lat' => 10.045162, // Đại học Cần Thơ
+        'lng' => 105.746857
+    );
     
     public function __construct($instance_id = 0) {
-        $this->id = 'can_tho_distance_shipping';
+        $this->id = 'simple_shipping_method';
         $this->instance_id = absint($instance_id);
-        $this->method_title = 'Tùy chọn giao hàng';
-        $this->method_description = 'Cho phép khách hàng chọn loại giao hàng (nhanh/tiết kiệm)';
+        $this->method_title = 'Tính phí ship theo khoảng cách';
+        $this->method_description = 'Tính phí ship tự động dựa trên khoảng cách từ Đại học Cần Thơ';
         $this->supports = array(
             'shipping-zones',
             'instance-settings',
@@ -33,107 +38,105 @@ class Can_Tho_Distance_Shipping extends WC_Shipping_Method {
             'enabled' => array(
                 'title' => 'Kích hoạt',
                 'type' => 'checkbox',
-                'description' => 'Kích hoạt tùy chọn loại giao hàng',
+                'description' => 'Kích hoạt phương thức giao hàng này',
                 'default' => 'yes'
             ),
             'title' => array(
                 'title' => 'Tiêu đề',
                 'type' => 'text',
                 'description' => 'Tiêu đề hiển thị cho khách hàng',
-                'default' => 'Tùy chọn giao hàng'
+                'default' => 'Giao hàng'
             )
         );
     }
     
     public function calculate_shipping($package = array()) {
-        if ($this->enabled !== 'yes') {
-            return;
-        }
-        
-        $customer_province = strtolower($package['destination']['state'] ?? '');
-        $customer_city = strtolower($package['destination']['city'] ?? '');
-        
-        if (empty($customer_province)) {
-            // Hiển thị options mặc định khi chưa có địa chỉ
-            $this->add_default_options();
-            return;
-        }
-        
-        // Chuẩn hóa tên tỉnh
-        $province_normalized = str_replace(array('tỉnh', 'thành phố', 'tp.', 'tp'), '', $customer_province);
-        $province_normalized = trim($province_normalized);
-        
-        $can_tho_provinces = array('can tho', 'cần thơ', 'cantho');
-        
-        if (in_array($province_normalized, $can_tho_provinces)) {
-            // Trong Cần Thơ - chỉ có giao hàng tiêu chuẩn
-            $this->add_local_delivery_option();
-        } else {
-            // Ngoài tỉnh - có 2 options (tiết kiệm/nhanh)
-            $this->add_viettel_post_options();
-        }
-    }
-    
-    private function add_local_delivery_option() {
-        $this->add_rate(array(
-            'id' => $this->get_rate_id() . '_local_standard',
-            'label' => '🚚 Giao hàng tiêu chuẩn (1-2 ngày)',
-            'cost' => 0, // Phí đã được tính ở cart fee
-            'meta_data' => array(
-                'delivery_method' => 'store_delivery',
-                'service_type' => 'standard'
-            )
-        ));
-    }
-    
-    private function add_viettel_post_options() {
-        // Gói tiết kiệm
-        $this->add_rate(array(
-            'id' => $this->get_rate_id() . '_viettel_economy',
-            'label' => '📦 Giao hàng tiết kiệm (3-5 ngày)',
-            'cost' => 5000, // Phí bổ sung +5k
-            'meta_data' => array(
-                'delivery_method' => 'viettel_post',
-                'service_type' => 'economy',
-                'extra_fee' => 5000
-            )
-        ));
-        
-        // Gói nhanh
-        $this->add_rate(array(
-            'id' => $this->get_rate_id() . '_viettel_express',
-            'label' => '⚡ Giao hàng nhanh (1-2 ngày)',
-            'cost' => 10000, // Phí bổ sung +10k
-            'meta_data' => array(
-                'delivery_method' => 'viettel_post',
-                'service_type' => 'express',
-                'extra_fee' => 10000
-            )
-        ));
-    }
-    
-    private function add_default_options() {
-        // Hiển thị khi chưa có địa chỉ
-        $this->add_rate(array(
-            'id' => $this->get_rate_id() . '_default_standard',
-            'label' => '🚚 Giao hàng tiêu chuẩn',
-            'cost' => 0
-        ));
-        
-        $this->add_rate(array(
-            'id' => $this->get_rate_id() . '_default_economy',
-            'label' => '📦 Giao hàng tiết kiệm (+5,000đ)',
-            'cost' => 5000
-        ));
-        
-        $this->add_rate(array(
-            'id' => $this->get_rate_id() . '_default_express',
-            'label' => '⚡ Giao hàng nhanh (+10,000đ)',
-            'cost' => 10000
-        ));
+        // Không add shipping rates nữa, sẽ dùng cart fees
+        return;
     }
     
     public function is_available($package) {
         return $this->enabled === 'yes';
+    }
+    
+    // Method tính khoảng cách
+    public function calculate_distance_to_customer($customer_address) {
+        // Sử dụng dữ liệu có sẵn cho các quận/huyện Cần Thơ
+        $distance = $this->get_predefined_distance($customer_address);
+        
+        if ($distance !== false) {
+            return $distance;
+        }
+        
+        // Fallback: tính theo API hoặc ước lượng
+        return $this->estimate_distance_by_province($customer_address);
+    }
+    
+    private function get_predefined_distance($address) {
+        $address_lower = strtolower($address);
+        
+        // Dữ liệu khoảng cách từ Đại học Cần Thơ
+        $distances = array(
+            'ninh kiều' => 5,
+            'cái răng' => 8,
+            'bình thủy' => 12,
+            'ô môn' => 15,
+            'thốt nốt' => 18,
+            'vĩnh thạnh' => 22,
+            'cờ đỏ' => 25,
+            'phong điền' => 28,
+            'thới lai' => 30,
+            // Thêm các quận/huyện khác
+            'chợ mới' => 35, // An Giang
+            'long xuyên' => 40,
+            'châu đốc' => 45,
+            'tân châu' => 38,
+            'an phú' => 42,
+            'bến tre' => 35,
+            'mỏ cày nam' => 40,
+            'giồng trôm' => 45,
+            'cà mau' => 50,
+            'u minh' => 48,
+            'ngọc hiển' => 55,
+        );
+        
+        foreach ($distances as $location => $distance) {
+            if (strpos($address_lower, $location) !== false) {
+                return $distance;
+            }
+        }
+        
+        return false;
+    }
+    
+    private function estimate_distance_by_province($address) {
+        $address_lower = strtolower($address);
+        
+        // Ước lượng theo tỉnh/thành phố
+        if (strpos($address_lower, 'cần thơ') !== false) {
+            return 15; // Trung bình trong thành phố
+        } elseif (strpos($address_lower, 'an giang') !== false || 
+                  strpos($address_lower, 'kiên giang') !== false ||
+                  strpos($address_lower, 'đồng tháp') !== false) {
+            return 45; // Tỉnh lân cận
+        } else {
+            return 60; // Khác tỉnh
+        }
+    }
+    
+    // Method tính phí ship
+    public function calculate_shipping_fee($distance, $is_economy = true) {
+        if ($distance <= 10) {
+            return 0; // Miễn phí
+        } elseif ($distance <= 20) {
+            return 15000;
+        } elseif ($distance <= 30) {
+            return 25000;
+        } else {
+            // Giao hàng xa - Viettel Post
+            $base_fee = $is_economy ? 30000 : 40000; // Base fee cho Viettel
+            $extra_fee = $is_economy ? 5000 : 10000; // Thêm phí
+            return $base_fee + $extra_fee;
+        }
     }
 }

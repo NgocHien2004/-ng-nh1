@@ -86,12 +86,16 @@ defined( 'ABSPATH' ) || exit;
 
 		<?php endif; ?>
 
-		<?php foreach ( WC()->cart->get_fees() as $fee ) : ?>
-			<tr class="fee">
-				<th>🚚 <?php echo esc_html( $fee->name ); ?></th>
-				<td><?php wc_cart_totals_fee_html( $fee ); ?></td>
-			</tr>
-		<?php endforeach; ?>
+		<?php 
+// Hiển thị thông tin khoảng cách trước fees
+phonestore_add_shipping_info_to_totals();
+
+foreach ( WC()->cart->get_fees() as $fee ) : ?>
+	<tr class="fee">
+		<th>🚚 <?php echo esc_html( $fee->name ); ?></th>
+		<td><?php wc_cart_totals_fee_html( $fee ); ?></td>
+	</tr>
+<?php endforeach; ?>
 
 		<?php if ( wc_tax_enabled() && ! WC()->cart->display_prices_including_tax() ) : ?>
 			<?php if ( 'itemized' === get_option( 'woocommerce_tax_total_display' ) ) : ?>

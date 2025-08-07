@@ -4420,5 +4420,269 @@ function phonestore_estimate_distance_in_can_tho($city, $address) {
     }
 }
 
+// TẮT TẤT CẢ SHIPPING METHODS CŨ
+function phonestore_disable_all_old_shipping_methods() {
+    // Tắt các shipping methods cũ
+    remove_action('woocommerce_shipping_init', 'phonestore_register_shipping_methods');
+    remove_filter('woocommerce_shipping_methods', 'phonestore_add_shipping_methods');
+    
+    remove_action('woocommerce_shipping_init', 'phonestore_register_vietnam_shipping');
+    remove_filter('woocommerce_shipping_methods', 'phonestore_add_vietnam_shipping');
+    
+    remove_action('woocommerce_shipping_init', 'phonestore_register_can_tho_shipping');
+    remove_filter('woocommerce_shipping_methods', 'phonestore_add_can_tho_shipping');
+    
+    // Tắt default WooCommerce shipping methods
+    add_filter('woocommerce_shipping_methods', function($methods) {
+        unset($methods['flat_rate']);
+        unset($methods['free_shipping']);
+        unset($methods['local_pickup']);
+        return $methods;
+    }, 100);
+}
+add_action('init', 'phonestore_disable_all_old_shipping_methods', 1);
 
+// ĐĂNG KÝ SHIPPING METHOD MỚI
+function phonestore_register_simple_shipping() {
+    require_once get_template_directory() . '/includes/class-simple-shipping.php';
+}
+
+function phonestore_add_simple_shipping($methods) {
+    $methods['simple_shipping_method'] = 'Simple_Shipping_Method';
+    return $methods;
+}
+
+add_action('woocommerce_shipping_init', 'phonestore_register_simple_shipping');
+add_filter('woocommerce_shipping_methods', 'phonestore_add_simple_shipping');
+
+// Tắt tất cả shipping zones và chỉ dùng method mới
+function phonestore_force_simple_shipping_only() {
+    add_filter('woocommerce_package_rates', function($rates) {
+        // Xóa tất cả rates cũ
+        $new_rates = array();
+        
+        foreach ($rates as $rate_id => $rate) {
+            // Chỉ giữ lại rates từ simple shipping method
+            if (strpos($rate_id, 'simple_shipping_method') !== false) {
+                $new_rates[$rate_id] = $rate;
+            }
+        }
+        
+        // Nếu không có rates nào, thêm fallback
+        if (empty($new_rates)) {
+            $new_rates['fallback_economy'] = new WC_Shipping_Rate(
+                'fallback_economy',
+                '📦 Ship Tiết kiệm - 3-5 ngày',
+                25000,
+                array(),
+                'simple_shipping_method'
+            );
+            
+            $new_rates['fallback_express'] = new WC_Shipping_Rate(
+                'fallback_express', 
+                '⚡ Ship Nhanh - 1-2 ngày',
+                45000,
+                array(),
+                'simple_shipping_method'
+            );
+        }
+        
+        return $new_rates;
+    }, 100);
+}
+add_action('init', 'phonestore_force_simple_shipping_only');
+
+    
+
+// Thêm thông tin ship vào cart totals
+function phonestore_add_shipping_info_to_totals() {
+    $distance = WC()->session->get('shipping_distance');
+    $shipping_type = WC()->session->get('shipping_type');
+    
+    if ($distance && $shipping_type) {
+        ?>
+        <tr class="shipping-info">
+            <th>📍 Khoảng cách giao hàng</th>
+            <td><?php echo round($distance, 1); ?>km 
+                <?php if ($shipping_type === 'free'): ?>
+                    <small style="color: #28a745;">(Miễn phí)</small>
+                <?php elseif ($shipping_type === 'local'): ?>
+                    <small style="color: #007cba;">(Cửa hàng tự giao)</small>
+                <?php else: ?>
+                    <small style="color: #e2401c;">(Viettel Post)</small>
+                <?php endif; ?>
+            </td>
+        </tr>
+        <?php
+    }
+}
+// XÓA TẤT CẢ SHIPPING METHODS CŨ
+remove_action('woocommerce_cart_calculate_fees', 'phonestore_add_shipping_fee');
+
+// TÍNH PHÍ SHIP TỰ ĐỘNG THEO ĐỊA CHỈ
+function phonestore_calculate_dynamic_shipping_fee() {
+    if (is_admin() && !defined('DOING_AJAX')) return;
+    if (!is_cart() && !is_checkout()) return;
+    
+    // Lấy địa chỉ khách hàng
+    $province = '';
+    $district = '';
+    
+    if (WC()->customer) {
+        $province = WC()->customer->get_billing_state();
+        $district = WC()->customer->get_billing_city();
+    }
+    
+    // Nếu có dữ liệu POST (khi customer thay đổi địa chỉ)
+    if (!empty($_POST['billing_state'])) {
+        $province = sanitize_text_field($_POST['billing_state']);
+    }
+    if (!empty($_POST['billing_city'])) {
+        $district = sanitize_text_field($_POST['billing_city']);
+    }
+    
+    // Tính phí ship
+    $shipping_fee = phonestore_get_shipping_fee($province, $district);
+    
+    // Xóa fee cũ nếu có
+    $fees = WC()->cart->get_fees();
+    foreach ($fees as $key => $fee) {
+        if ($fee->name === 'Phí vận chuyển') {
+            WC()->cart->remove_fee($key);
+        }
+    }
+    
+    // Thêm phí ship mới
+}
+add_action('woocommerce_cart_calculate_fees', 'phonestore_calculate_dynamic_shipping_fee');
+
+// FUNCTION TÍNH PHÍ SHIP THEO ĐỊA CHỈ
+function phonestore_get_shipping_fee($province, $district) {
+    if (empty($province) || empty($district)) {
+        return 0; // Chưa chọn địa chỉ
+    }
+    
+    $province = strtolower(trim($province));
+    $district = strtolower(trim($district));
+    
+    // Danh sách quận/huyện nội thành Cần Thơ
+    $cantho_districts = array(
+        'ninh kiều', 'bình thủy', 'cái răng', 'ô môn', 'thốt nốt',
+        'vĩnh thạnh', 'cờ đỏ', 'phong điền', 'thới lai'
+    );
+    
+    // Kiểm tra nội thành Cần Thơ
+    if (strpos($province, 'cần thơ') !== false) {
+        foreach ($cantho_districts as $cantho_district) {
+            if (strpos($district, $cantho_district) !== false) {
+                return 0; // MIỄN PHÍ nội thành Cần Thơ
+            }
+        }
+        return 25000; // Ngoài nội thành Cần Thơ +25k
+    }
+    
+    // Khác tỉnh/thành phố
+    // Lấy shipping method đã chọn (mặc định là tiết kiệm)
+    $selected_method = WC()->session->get('chosen_shipping_methods');
+    $is_express = false;
+    
+    if (is_array($selected_method) && !empty($selected_method[0])) {
+        $is_express = (strpos($selected_method[0], 'express') !== false);
+    }
+    
+    if ($is_express) {
+        return 35000; // Gói nhanh: 25k + 10k = 35k  
+    } else {
+        return 30000; // Gói tiết kiệm: 25k + 5k = 30k
+    }
+}
+
+// HIỂN THỊ LỰA CHỌN SHIP NHANH/TIẾT KIỆM
+function phonestore_add_shipping_method_selector() {
+    if (!is_cart() && !is_checkout()) return;
+    
+    ?>
+    <div class="shipping-method-selector" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+        <h4>🚚 Chọn phương thức giao hàng:</h4>
+        <div style="display: flex; gap: 15px; margin-top: 10px;">
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="radio" name="shipping_speed" value="economy" checked style="margin-right: 8px;">
+                <span>📦 Giao hàng tiết kiệm (3-5 ngày)</span>
+            </label>
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="radio" name="shipping_speed" value="express" style="margin-right: 8px;">
+                <span>⚡ Giao hàng nhanh (1-2 ngày)</span>
+            </label>
+        </div>
+    </div>
+    
+    <script type="text/javascript">
+    jQuery(document).ready(function($) {
+        $('input[name="shipping_speed"]').on('change', function() {
+            var method = $(this).val();
+            
+            // Lưu lựa chọn vào session
+            $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
+                action: 'update_shipping_method',
+                shipping_method: method,
+                nonce: '<?php echo wp_create_nonce('shipping_nonce'); ?>'
+            }, function() {
+                // Trigger update checkout
+                if (typeof $('body').trigger !== 'undefined') {
+                    $('body').trigger('update_checkout');
+                } else {
+                    location.reload();
+                }
+            });
+        });
+    });
+    </script>
+    <?php
+}
+
+// Thêm selector vào checkout
+add_action('woocommerce_checkout_before_order_review', 'phonestore_add_shipping_method_selector');
+
+// AJAX handler để update shipping method
+function phonestore_update_shipping_method() {
+    if (!wp_verify_nonce($_POST['nonce'], 'shipping_nonce')) {
+        wp_die('Security check failed');
+    }
+    
+    $shipping_method = sanitize_text_field($_POST['shipping_method']);
+    
+    // Lưu vào session
+    WC()->session->set('chosen_shipping_methods', array($shipping_method));
+    WC()->session->set('phonestore_shipping_speed', $shipping_method);
+    
+    wp_die();
+}
+add_action('wp_ajax_update_shipping_method', 'phonestore_update_shipping_method');
+add_action('wp_ajax_nopriv_update_shipping_method', 'phonestore_update_shipping_method');
+
+// TẮT HIỂN THỊ SHIPPING METHODS MẶC ĐỊNH
+function phonestore_hide_shipping_methods($rates) {
+    return array(); // Trả về mảng rỗng để ẩn tất cả shipping methods
+}
+add_filter('woocommerce_package_rates', 'phonestore_hide_shipping_methods', 100);
+
+// CẬP NHẬT FEE KHI THAY ĐỔI ĐỊA CHỈ
+function phonestore_update_shipping_fee_ajax() {
+    // Script để update phí ship real-time
+    if (is_checkout() || is_cart()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Update khi thay đổi địa chỉ
+            $(document).on('change', '#billing_state, #billing_city', function() {
+                setTimeout(function() {
+                    $('body').trigger('update_checkout');
+                }, 500);
+            });
+        });
+        </script>
+        <?php
+    }
+}
+add_action('wp_footer', 'phonestore_update_shipping_fee_ajax');
 ?>
