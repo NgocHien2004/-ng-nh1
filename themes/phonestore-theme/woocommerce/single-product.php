@@ -140,93 +140,54 @@ get_header(); ?>
             <?php echo apply_filters('woocommerce_short_description', $product->get_short_description()); ?>
         </div>
         
-        <!-- Product Specs với nhóm attributes đầy đủ -->
+<!-- Product Specs với nhóm attributes đầy đủ -->
         <div class="product-specs">
             <h3>📋 Thông số kỹ thuật</h3>
-            <div class="specs-container">
+            
+            <!-- Hiển thị specs rút gọn ban đầu -->
+            <div class="specs-container specs-preview">
                 <?php
-                // Định nghĩa mapping từ attributes hiện tại sang nhóm
-                $attribute_mapping = array(
-                    // Thông tin cơ bản
-                    'brand' => array('group' => 'basic', 'label' => '🏷️ Thương hiệu'),
-                    'model' => array('group' => 'basic', 'label' => '📱 Dòng sản phẩm'),
-                    'launch_date' => array('group' => 'basic', 'label' => '📅 Thời điểm ra mắt'),
-                    'price_range' => array('group' => 'basic', 'label' => '💰 Khoảng giá'),
-                    'design' => array('group' => 'basic', 'label' => '🎨 Thiết kế'),
-                    
-                    // Màn hình
-                    'screen_size' => array('group' => 'display', 'label' => '📺 Kích thước màn hình'),
-                    'screen_resolution' => array('group' => 'display', 'label' => '🔍 Độ phân giải màn hình'),
-                    'screen_technology' => array('group' => 'display', 'label' => '💻 Công nghệ màn hình'),
-                    'brightness' => array('group' => 'display', 'label' => '☀️ Độ sáng tối đa'),
-                    'refresh_rate' => array('group' => 'display', 'label' => '🔄 Tần số quét'),
-                    'screen_material' => array('group' => 'display', 'label' => '🛡️ Mặt kính cảm ứng'),
-                    
-                    // Hiệu năng
-                    'cpu' => array('group' => 'performance', 'label' => '⚡ Chip xử lý (CPU)'),
-                    'gpu' => array('group' => 'performance', 'label' => '🎮 Chip đồ họa (GPU)'),
-                    'ram' => array('group' => 'performance', 'label' => '💾 RAM'),
-                    'storage' => array('group' => 'performance', 'label' => '💿 Bộ nhớ trong'),
-                    'os' => array('group' => 'performance', 'label' => '🖥️ Hệ điều hành'),
-                    
-                    // Camera
-                    'rear_camera' => array('group' => 'camera', 'label' => '📷 Camera sau'),
-                    'front_camera' => array('group' => 'camera', 'label' => '🤳 Camera trước'),
-                    'camera_features' => array('group' => 'camera', 'label' => '✨ Tính năng camera sau'),
-                    'front_camera_features' => array('group' => 'camera', 'label' => '🔧 Tính năng camera trước'),
-                    'video_recording' => array('group' => 'camera', 'label' => '🎬 Quay phim'),
-                    
-                    // Kết nối
-                    'network' => array('group' => 'connectivity', 'label' => '📶 Mạng di động'),
-                    'wifi' => array('group' => 'connectivity', 'label' => '📶 Wi-Fi'),
-                    'bluetooth' => array('group' => 'connectivity', 'label' => '🔗 Bluetooth'),
-                    'gps' => array('group' => 'connectivity', 'label' => '🗺️ GPS'),
-                    'nfc' => array('group' => 'connectivity', 'label' => '📱 NFC'),
-                    'sim' => array('group' => 'connectivity', 'label' => '📞 SIM'),
-                    'charging_port' => array('group' => 'connectivity', 'label' => '🔌 Cổng sạc'),
-                    'audio_jack' => array('group' => 'connectivity', 'label' => '🎧 Jack tai nghe'),
-                    
-                    // Pin & Sạc
-                    'battery_capacity' => array('group' => 'battery', 'label' => '🔋 Dung lượng pin'),
-                    'battery_type' => array('group' => 'battery', 'label' => '⚡ Loại pin'),
-                    'charging_power' => array('group' => 'battery', 'label' => '⚡ Công suất sạc'),
-                    'charging_tech' => array('group' => 'battery', 'label' => '🔌 Công nghệ pin'),
-                    
-                    // Thiết kế
-                    'dimensions' => array('group' => 'design', 'label' => '📏 Kích thước'),
-                    'material' => array('group' => 'design', 'label' => '🏗️ Chất liệu'),
-                    'water_resistance' => array('group' => 'design', 'label' => '💧 Kháng nước'),
-                    'colors' => array('group' => 'design', 'label' => '🎨 Màu sắc'),
-                    
-                    // Bảo mật
-                    'security_features' => array('group' => 'security', 'label' => '🔒 Bảo mật'),
-                    
-                    // Đa phương tiện
-                    'audio_formats' => array('group' => 'multimedia', 'label' => '🎵 Định dạng âm thanh'),
-                    'video_formats' => array('group' => 'multimedia', 'label' => '🎬 Định dạng video'),
-                    'special_features' => array('group' => 'multimedia', 'label' => '⭐ Tính năng đặc biệt')
-                );
-                
-                // Nhóm hiển thị
-                $display_groups = array(
+                // Chỉ hiển thị 3 nhóm quan trọng nhất
+                $preview_groups = array(
                     'basic' => '🏷️ Thông tin cơ bản',
-                    'display' => '📺 Màn hình', 
-                    'performance' => '⚡ Hiệu năng',
-                    'camera' => '📷 Camera',
-                    'connectivity' => '🌐 Kết nối',
-                    'battery' => '🔋 Pin & Sạc',
-                    'design' => '🎨 Thiết kế',
-                    'security' => '🔒 Bảo mật',
-                    'multimedia' => '🎵 Đa phương tiện'
+                    'display' => '📺 Màn hình & Hiển thị', 
+                    'performance' => '⚡ Hiệu năng & Hệ thống'
                 );
                 
-                // Lấy tất cả attributes/meta fields
+                // Định nghĩa mapping cho preview
+                $preview_attribute_mapping = array(
+                    // Thông tin cơ bản
+                    'thuong-hieu-brand' => array('group' => 'basic', 'label' => '🏷️ Thương hiệu'),
+                    'hang' => array('group' => 'basic', 'label' => '🏭 Hãng'),
+                    'thiet-ke' => array('group' => 'basic', 'label' => '🎨 Thiết kế'),
+                    'thoi-diem-ra-mat' => array('group' => 'basic', 'label' => '📅 Thời điểm ra mắt'),
+                    'xem-phim' => array('group' => 'basic', 'label' => '🎬 Xem phim'),
+                    
+                    // Màn hình & Hiển thị
+                    'kich-thuoc-man-hinh' => array('group' => 'display', 'label' => '📺 Kích thước màn hình'),
+                    'cong-nghe-man-hinh' => array('group' => 'display', 'label' => '💻 Công nghệ màn hình'),
+                    'do-phan-giai-man-hinh' => array('group' => 'display', 'label' => '🔍 Độ phân giải màn hình'),
+                    'do-sang-toi-da' => array('group' => 'display', 'label' => '☀️ Độ sáng tối đa'),
+                    'mat-kinh-cam-ung' => array('group' => 'display', 'label' => '👆 Mặt kính cảm ứng'),
+                    
+                    // Hiệu năng & Hệ thống
+                    'chip-xu-ly-cpu' => array('group' => 'performance', 'label' => '⚡ Chip xử lý (CPU)'),
+                    'chip-do-hoa-gpu' => array('group' => 'performance', 'label' => '🎮 Chip đồ họa (GPU)'),
+                    'ram' => array('group' => 'performance', 'label' => '💾 RAM'),
+                    'bo-nho-storage' => array('group' => 'performance', 'label' => '💿 Bộ nhớ trong'),
+                    'he-dieu-hanh' => array('group' => 'performance', 'label' => '🖥️ Hệ điều hành'),
+                    'toc-do-cpu' => array('group' => 'performance', 'label' => '🚀 Tốc độ CPU')
+                );
+                
+                // Lấy tất cả specs
                 $all_specs = array();
                 
                 // Lấy WooCommerce attributes
                 $wc_attributes = $product->get_attributes();
                 foreach ($wc_attributes as $attribute) {
-                    $attribute_name = str_replace('pa_', '', $attribute->get_name());
+                    $attribute_name = $attribute->get_name();
+                    $clean_name = str_replace('pa_', '', $attribute_name);
+                    
                     if ($attribute->is_taxonomy()) {
                         $values = wc_get_product_terms($product_id, $attribute->get_name(), array('fields' => 'names'));
                         $value = implode(', ', $values);
@@ -237,7 +198,7 @@ get_header(); ?>
                         }
                     }
                     if (!empty($value)) {
-                        $all_specs[$attribute_name] = $value;
+                        $all_specs[$clean_name] = $value;
                     }
                 }
                 
@@ -249,30 +210,35 @@ get_header(); ?>
                     }
                 }
                 
-                // Nhóm specs theo group
-                $grouped_specs = array();
+                // Nhóm specs theo group cho preview
+                $preview_grouped_specs = array();
                 foreach ($all_specs as $key => $value) {
-                    if (isset($attribute_mapping[$key])) {
-                        $group = $attribute_mapping[$key]['group'];
-                        $label = $attribute_mapping[$key]['label'];
-                        $grouped_specs[$group][] = array('label' => $label, 'value' => $value);
+                    if (isset($preview_attribute_mapping[$key])) {
+                        $group = $preview_attribute_mapping[$key]['group'];
+                        $label = $preview_attribute_mapping[$key]['label'];
+                        $preview_grouped_specs[$group][] = array('label' => $label, 'value' => $value);
                     }
                 }
                 
-                // Hiển thị từng nhóm
+                // Hiển thị 3 nhóm preview
                 $has_any_specs = false;
-                foreach ($display_groups as $group_key => $group_title) {
-                    if (isset($grouped_specs[$group_key]) && !empty($grouped_specs[$group_key])) {
+                foreach ($preview_groups as $group_key => $group_title) {
+                    if (isset($preview_grouped_specs[$group_key]) && !empty($preview_grouped_specs[$group_key])) {
                         $has_any_specs = true;
                         echo '<div class="spec-group">';
                         echo '<h4 class="spec-group-title">' . esc_html($group_title) . '</h4>';
                         echo '<div class="spec-group-content">';
                         
-                        foreach ($grouped_specs[$group_key] as $spec) {
+                        // Hiển thị tối đa 4 specs mỗi nhóm trong preview
+                        $count = 0;
+                        foreach ($preview_grouped_specs[$group_key] as $spec) {
+                            if ($count >= 4) break;
+                            
                             echo '<div class="spec-item">';
                             echo '<span class="spec-label">' . esc_html($spec['label']) . ':</span>';
                             echo '<span class="spec-value">' . esc_html($spec['value']) . '</span>';
                             echo '</div>';
+                            $count++;
                         }
                         
                         echo '</div></div>';
@@ -290,10 +256,189 @@ get_header(); ?>
                 }
                 ?>
             </div>
+            
+            <!-- Nút xem chi tiết -->
+            <div class="specs-toggle">
+                <button id="toggle-specs-btn" class="toggle-specs-btn">
+                    📖 Xem thông tin chi tiết
+                </button>
+            </div>
         </div>
-    </div>
-</div>
 
+        <!-- Modal hiển thị đầy đủ specs -->
+        <div id="specs-modal" class="specs-modal" style="display: none;">
+            <div class="specs-modal-content">
+                <div class="specs-modal-header">
+                    <h2>📋 Thông số kỹ thuật chi tiết - <?php echo get_the_title(); ?></h2>
+                    <button class="specs-modal-close">&times;</button>
+                </div>
+                
+                <div class="specs-modal-body">
+                    <div class="specs-table-container">
+                        <?php
+                        // Định nghĩa mapping đầy đủ cho modal
+                        $full_attribute_mapping = array(
+                            // Thông tin cơ bản
+                            'thuong-hieu-brand' => array('group' => 'basic', 'label' => 'Thương hiệu'),
+                            'hang' => array('group' => 'basic', 'label' => 'Hãng'),
+                            'thiet-ke' => array('group' => 'basic', 'label' => 'Thiết kế'),
+                            'khoang-gia' => array('group' => 'basic', 'label' => 'Khoảng giá'),
+                            'thoi-diem-ra-mat' => array('group' => 'basic', 'label' => 'Thời điểm ra mắt'),
+                            'xem-phim' => array('group' => 'basic', 'label' => 'Xem phim'),
+                            
+                            // Màn hình & Hiển thị
+                            'kich-thuoc-man-hinh' => array('group' => 'display', 'label' => 'Kích thước màn hình'),
+                            'do-phan-giai-man-hinh' => array('group' => 'display', 'label' => 'Độ phân giải màn hình'),
+                            'cong-nghe-man-hinh' => array('group' => 'display', 'label' => 'Công nghệ màn hình'),
+                            'do-sang-toi-da' => array('group' => 'display', 'label' => 'Độ sáng tối đa'),
+                            'mat-kinh-cam-ung' => array('group' => 'display', 'label' => 'Mặt kính cảm ứng'),
+                            
+                            // Hiệu năng & Hệ thống
+                            'chip-xu-ly-cpu' => array('group' => 'performance', 'label' => 'Chip xử lý (CPU)'),
+                            'chip-do-hoa-gpu' => array('group' => 'performance', 'label' => 'Chip đồ họa (GPU)'),
+                            'ram' => array('group' => 'performance', 'label' => 'RAM'),
+                            'bo-nho-storage' => array('group' => 'performance', 'label' => 'Bộ nhớ trong'),
+                            'he-dieu-hanh' => array('group' => 'performance', 'label' => 'Hệ điều hành'),
+                            'toc-do-cpu' => array('group' => 'performance', 'label' => 'Tốc độ CPU'),
+                            'vi-xu-ly' => array('group' => 'performance', 'label' => 'Vi xử lý'),
+                            
+                            // Camera & Chụp ảnh
+                            'camera' => array('group' => 'camera', 'label' => 'Camera chính'),
+                            'do-phan-giai-camera-sau' => array('group' => 'camera', 'label' => 'Độ phân giải camera sau'),
+                            'do-phan-giai-camera-truoc' => array('group' => 'camera', 'label' => 'Độ phân giải camera trước'),
+                            'tinh-nang-camera-sau' => array('group' => 'camera', 'label' => 'Tính năng camera sau'),
+                            'tinh-nang-camera-truoc' => array('group' => 'camera', 'label' => 'Tính năng camera trước'),
+                            'quay-phim-camera-sau' => array('group' => 'camera', 'label' => 'Quay phim camera sau'),
+                            'tinh-nang-dac-biet' => array('group' => 'camera', 'label' => 'Tính năng đặc biệt'),
+                            
+                            // Kết nối & Mạng
+                            'sim' => array('group' => 'connectivity', 'label' => 'SIM'),
+                            'bluetooth' => array('group' => 'connectivity', 'label' => 'Bluetooth'),
+                            'wifi' => array('group' => 'connectivity', 'label' => 'Wi-Fi'),
+                            'gps' => array('group' => 'connectivity', 'label' => 'GPS'),
+                            'ket-noi-khac' => array('group' => 'connectivity', 'label' => 'Kết nối khác'),
+                            'mang-di-dong' => array('group' => 'connectivity', 'label' => 'Mạng di động'),
+                            'jack-tai-nghe' => array('group' => 'connectivity', 'label' => 'Jack tai nghe'),
+                            'cong-ket-noi-sac' => array('group' => 'connectivity', 'label' => 'Cổng kết nối/sạc'),
+                            
+                            // Pin & Sạc
+                            'pin' => array('group' => 'battery', 'label' => 'Pin'),
+                            'dung-luong-pin' => array('group' => 'battery', 'label' => 'Dung lượng pin'),
+                            'loai-pin' => array('group' => 'battery', 'label' => 'Loại pin'),
+                            'cong-nghe-pin' => array('group' => 'battery', 'label' => 'Công nghệ pin'),
+                            'ho-tro-sac-toi-da' => array('group' => 'battery', 'label' => 'Hỗ trợ sạc tối đa'),
+                            
+                            // Thiết kế & Vật liệu
+                            'kich-thuoc-khoi-luong' => array('group' => 'design', 'label' => 'Kích thước, khối lượng'),
+                            'chat-lieu' => array('group' => 'design', 'label' => 'Chất liệu'),
+                            'kháng-nuoc-bui' => array('group' => 'design', 'label' => 'Kháng nước, bụi'),
+                            'bao-mat-nang-cao' => array('group' => 'design', 'label' => 'Bảo mật nâng cao'),
+                            
+                            // Âm thanh & Giải trí
+                            'nghe-nhac' => array('group' => 'multimedia', 'label' => 'Nghe nhạc')
+                        );
+                        
+                        // Nhóm hiển thị trong modal
+                        $modal_display_groups = array(
+                            'basic' => '🏷️ Thông tin cơ bản',
+                            'display' => '📺 Màn hình & Hiển thị', 
+                            'performance' => '⚡ Hiệu năng & Hệ thống',
+                            'camera' => '📷 Camera & Chụp ảnh',
+                            'connectivity' => '🌐 Kết nối & Mạng',
+                            'battery' => '🔋 Pin & Sạc',
+                            'design' => '🎨 Thiết kế & Vật liệu',
+                            'multimedia' => '🎵 Âm thanh & Giải trí'
+                        );
+                        
+                        // Nhóm specs theo group cho modal
+                        $modal_grouped_specs = array();
+                        $ungrouped_specs = array();
+                        
+                        foreach ($all_specs as $key => $value) {
+                            if (isset($full_attribute_mapping[$key])) {
+                                $group = $full_attribute_mapping[$key]['group'];
+                                $label = $full_attribute_mapping[$key]['label'];
+                                $modal_grouped_specs[$group][] = array('label' => $label, 'value' => $value);
+                            } else {
+                                // Specs không có trong mapping
+                                $label = ucwords(str_replace(array('-', '_'), ' ', $key));
+                                $ungrouped_specs[] = array('label' => $label, 'value' => $value);
+                            }
+                        }
+                        
+                        // Hiển thị từng nhóm trong modal dưới dạng bảng
+                        foreach ($modal_display_groups as $group_key => $group_title) {
+                            if (isset($modal_grouped_specs[$group_key]) && !empty($modal_grouped_specs[$group_key])) {
+                                echo '<div class="specs-group-section">';
+                                echo '<h3 class="specs-group-header">' . esc_html($group_title) . '</h3>';
+                                echo '<table class="specs-table">';
+                                
+                                foreach ($modal_grouped_specs[$group_key] as $spec) {
+                                    // Xử lý xuống dòng cho các giá trị có dấu phẩy
+                                    $formatted_value = $spec['value'];
+                                    if (strpos($formatted_value, ',') !== false) {
+                                        $parts = array_map('trim', explode(',', $formatted_value));
+                                        $formatted_value = '<ul class="spec-list">';
+                                        foreach ($parts as $part) {
+                                            if (!empty($part)) {
+                                                $formatted_value .= '<li>' . esc_html($part) . '</li>';
+                                            }
+                                        }
+                                        $formatted_value .= '</ul>';
+                                    } else {
+                                        $formatted_value = esc_html($formatted_value);
+                                    }
+                                    
+                                    echo '<tr>';
+                                    echo '<td class="spec-label-col">' . esc_html($spec['label']) . '</td>';
+                                    echo '<td class="spec-value-col">' . $formatted_value . '</td>';
+                                    echo '</tr>';
+                                }
+                                
+                                echo '</table>';
+                                echo '</div>';
+                            }
+                        }
+                        
+                        // Hiển thị specs không có nhóm
+                        if (!empty($ungrouped_specs)) {
+                            echo '<div class="specs-group-section">';
+                            echo '<h3 class="specs-group-header">📋 Thông số khác</h3>';
+                            echo '<table class="specs-table">';
+                            
+                            foreach ($ungrouped_specs as $spec) {
+                                $formatted_value = $spec['value'];
+                                if (strpos($formatted_value, ',') !== false) {
+                                    $parts = array_map('trim', explode(',', $formatted_value));
+                                    $formatted_value = '<ul class="spec-list">';
+                                    foreach ($parts as $part) {
+                                        if (!empty($part)) {
+                                            $formatted_value .= '<li>' . esc_html($part) . '</li>';
+                                        }
+                                    }
+                                    $formatted_value .= '</ul>';
+                                } else {
+                                    $formatted_value = esc_html($formatted_value);
+                                }
+                                
+                                echo '<tr>';
+                                echo '<td class="spec-label-col">' . esc_html($spec['label']) . '</td>';
+                                echo '<td class="spec-value-col">' . $formatted_value . '</td>';
+                                echo '</tr>';
+                            }
+                            
+                            echo '</table>';
+                            echo '</div>';
+                        }
+                        ?>
+                    </div>
+                </div>
+                
+                <div class="specs-modal-footer">
+                    <button class="specs-modal-close-btn">📕 Đóng</button>
+                </div>
+            </div>
+        </div>
             
             <!-- Product Description -->
             <div class="product-description">
@@ -1255,9 +1400,965 @@ get_header(); ?>
         max-height: 400px;
     }
 }
+
+/* Spec lines for multi-value attributes */
+.spec-line {
+    margin: 2px 0;
+    padding: 2px 0;
+    line-height: 1.4;
+}
+
+.spec-line:not(:last-child) {
+    border-bottom: 1px dotted #e2e8f0;
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+}
+
+/* Improved spacing for spec values */
+.spec-value {
+    color: #2d3748;
+    font-weight: 500;
+    font-size: 14px;
+    word-wrap: break-word;
+    line-height: 1.5;
+}
+
+/* Better spacing between specs */
+.spec-item {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 15px;
+    padding: 12px 0;
+    border-bottom: 1px solid #e2e8f0;
+    align-items: start; /* Align to top for multi-line content */
+}
+/* Single Product Styles */
+.single-product-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.product-breadcrumb {
+    background: #f8fafc;
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+
+.product-breadcrumb a {
+    color: #667eea;
+    text-decoration: none;
+}
+
+.product-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.product-breadcrumb span {
+    margin: 0 10px;
+    color: #718096;
+}
+
+.product-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 50px;
+    margin-bottom: 50px;
+}
+
+/* Product Gallery */
+.product-gallery {
+    position: sticky;
+    top: 100px;
+}
+
+.main-image-container {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.main-image {
+    position: relative;
+    height: 500px;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.main-image img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: transform 0.3s;
+    padding: 20px;
+}
+
+.gallery-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.9);
+    border: none;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 20px;
+    color: #4a5568;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transition: all 0.3s;
+}
+
+.gallery-nav:hover {
+    background: white;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.prev-btn {
+    left: 20px;
+}
+
+.next-btn {
+    right: 20px;
+}
+
+.thumbnail-gallery {
+    display: flex;
+    gap: 10px;
+    padding: 20px;
+    overflow-x: auto;
+    justify-content: center;
+}
+
+.thumbnail {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 10px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: all 0.3s;
+    border: 2px solid transparent;
+}
+
+.thumbnail:hover,
+.thumbnail.active {
+    opacity: 1;
+    border-color: #667eea;
+    transform: scale(1.05);
+}
+
+/* Product Info */
+.product-info {
+    background: white;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    height: fit-content;
+}
+
+.product-title {
+    font-size: 2rem;
+    color: #2d3748;
+    margin-bottom: 20px;
+    font-weight: 800;
+}
+
+.product-price {
+    font-size: 1.8rem;
+    color: #e53e3e;
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+.product-rating {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 25px;
+}
+
+.stars {
+    color: #f6e05e;
+    font-size: 1.2rem;
+}
+
+.review-count {
+    color: #718096;
+    font-size: 14px;
+}
+
+.product-short-description {
+    color: #4a5568;
+    line-height: 1.6;
+    margin-bottom: 30px;
+    font-size: 16px;
+}
+
+/* Specs Styles */
+.product-specs {
+    margin-bottom: 30px;
+}
+
+.product-specs h3 {
+    color: #2d3748;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.specs-container {
+    display: grid;
+    gap: 20px;
+}
+
+.spec-group {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 20px;
+    border-left: 4px solid #667eea;
+}
+
+.spec-group-title {
+    color: #2d3748;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 15px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.spec-group-content {
+    display: grid;
+    gap: 10px;
+}
+
+.spec-item {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 15px;
+    padding: 8px 0;
+    border-bottom: 1px solid #e2e8f0;
+    align-items: start;
+}
+
+.spec-item:last-child {
+    border-bottom: none;
+}
+
+.spec-label {
+    font-weight: 600;
+    color: #4a5568;
+    font-size: 14px;
+}
+
+.spec-value {
+    color: #2d3748;
+    font-weight: 500;
+    font-size: 14px;
+    word-wrap: break-word;
+    line-height: 1.5;
+}
+
+/* Specs Toggle Button */
+.specs-toggle {
+    text-align: center;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 2px solid #e2e8f0;
+}
+
+.toggle-specs-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.toggle-specs-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+    background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%);
+}
+
+.toggle-specs-btn:active {
+    transform: translateY(-1px);
+}
+
+/* Modal Styles */
+.specs-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(5px);
+}
+
+.specs-modal-content {
+    background: white;
+    border-radius: 20px;
+    max-width: 90vw;
+    max-height: 90vh;
+    width: 1200px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.specs-modal-header {
+    padding: 25px 30px;
+    border-bottom: 3px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+    border-radius: 20px 20px 0 0;
+}
+
+.specs-modal-header h2 {
+    margin: 0;
+    color: #2d3748;
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+
+.specs-modal-close {
+    background: none;
+    border: none;
+    font-size: 30px;
+    cursor: pointer;
+    color: #718096;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+.specs-modal-close:hover {
+    background: #fed7d7;
+    color: #e53e3e;
+    transform: scale(1.1);
+}
+
+.specs-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.specs-table-container {
+    padding: 30px;
+}
+
+.specs-group-section {
+    margin-bottom: 40px;
+}
+
+.specs-group-header {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #2d3748;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 3px solid #667eea;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.specs-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.specs-table tr {
+    border-bottom: 1px solid #e2e8f0;
+    transition: background-color 0.2s;
+}
+
+.specs-table tr:hover {
+    background-color: #f7fafc;
+}
+
+.specs-table tr:last-child {
+    border-bottom: none;
+}
+
+.spec-label-col {
+    background: #f8fafc;
+    font-weight: 700;
+    color: #4a5568;
+    padding: 15px 20px;
+   width: 30%;
+   vertical-align: top;
+   border-right: 2px solid #e2e8f0;
+}
+
+.spec-value-col {
+   padding: 15px 20px;
+   color: #2d3748;
+   vertical-align: top;
+   line-height: 1.6;
+}
+
+.spec-list {
+   margin: 0;
+   padding-left: 20px;
+   list-style-type: none;
+}
+
+.spec-list li {
+   margin-bottom: 8px;
+   padding: 5px 0;
+   border-bottom: 1px dotted #e2e8f0;
+   position: relative;
+}
+
+.spec-list li:last-child {
+   border-bottom: none;
+   margin-bottom: 0;
+}
+
+.spec-list li:before {
+   content: "▸";
+   color: #667eea;
+   font-weight: bold;
+   position: absolute;
+   left: -15px;
+}
+
+.specs-modal-footer {
+   padding: 20px 30px;
+   border-top: 2px solid #e2e8f0;
+   text-align: center;
+   background: #f7fafc;
+   border-radius: 0 0 20px 20px;
+}
+
+.specs-modal-close-btn {
+   background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+   color: white;
+   border: none;
+   padding: 12px 25px;
+   border-radius: 25px;
+   font-size: 16px;
+   font-weight: 700;
+   cursor: pointer;
+   transition: all 0.3s ease;
+   box-shadow: 0 4px 15px rgba(229, 62, 62, 0.3);
+   text-transform: uppercase;
+   letter-spacing: 0.5px;
+}
+
+.specs-modal-close-btn:hover {
+   transform: translateY(-2px);
+   box-shadow: 0 8px 25px rgba(229, 62, 62, 0.4);
+   background: linear-gradient(135deg, #c53030 0%, #9c1a1c 100%);
+}
+
+/* Actions moved under gallery */
+.product-actions {
+   margin-top: 30px;
+   background: white;
+   padding: 25px;
+   border-radius: 15px;
+   box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.quantity-selector {
+   display: flex;
+   align-items: center;
+   gap: 15px;
+   margin-bottom: 20px;
+   justify-content: center;
+}
+
+.quantity-selector label {
+   font-weight: 600;
+   color: #4a5568;
+   font-size: 16px;
+}
+
+.quantity-input {
+   display: flex;
+   align-items: center;
+   border: 2px solid #e2e8f0;
+   border-radius: 8px;
+   overflow: hidden;
+}
+
+.qty-btn {
+   background: #f8fafc;
+   border: none;
+   width: 40px;
+   height: 40px;
+   cursor: pointer;
+   font-size: 16px;
+   font-weight: bold;
+   transition: background 0.3s;
+}
+
+.qty-btn:hover {
+   background: #e2e8f0;
+}
+
+.quantity-input input {
+   width: 60px;
+   height: 40px;
+   text-align: center;
+   border: none;
+   font-size: 16px;
+   font-weight: 600;
+}
+
+.action-buttons {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+   gap: 12px;
+}
+
+.add-to-cart-btn,
+.buy-now-btn,
+.compare-btn,
+.wishlist-btn {
+   padding: 12px 16px;
+   border: none;
+   border-radius: 10px;
+   font-size: 14px;
+   font-weight: 700;
+   cursor: pointer;
+   transition: all 0.3s;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   gap: 6px;
+   min-height: 44px;
+}
+
+.add-to-cart-btn {
+   background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+   color: white;
+   box-shadow: 0 4px 15px rgba(56, 161, 105, 0.3);
+}
+
+.add-to-cart-btn:hover {
+   transform: translateY(-2px);
+   box-shadow: 0 8px 25px rgba(56, 161, 105, 0.4);
+}
+
+.buy-now-btn {
+   background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+   color: white;
+   box-shadow: 0 4px 15px rgba(229, 62, 62, 0.3);
+}
+
+.buy-now-btn:hover {
+   transform: translateY(-2px);
+   box-shadow: 0 8px 25px rgba(229, 62, 62, 0.4);
+}
+
+.compare-btn {
+   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+   color: white;
+   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.compare-btn:hover {
+   transform: translateY(-2px);
+   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.wishlist-btn {
+   background: linear-gradient(135deg, #ed64a6 0%, #d53f8c 100%);
+   color: white;
+   box-shadow: 0 4px 15px rgba(237, 100, 166, 0.3);
+}
+
+.wishlist-btn:hover {
+   transform: translateY(-2px);
+   box-shadow: 0 8px 25px rgba(237, 100, 166, 0.4);
+}
+
+/* Additional Info under actions */
+.additional-info {
+   margin-top: 20px;
+   display: grid;
+   gap: 12px;
+}
+
+.info-item {
+   display: flex;
+   align-items: center;
+   gap: 12px;
+   padding: 12px;
+   background: #f8fafc;
+   border-radius: 8px;
+   border-left: 4px solid #38a169;
+}
+
+.info-item .icon {
+   font-size: 20px;
+   min-width: 24px;
+}
+
+.info-text strong {
+   display: block;
+   color: #2d3748;
+   font-size: 14px;
+   margin-bottom: 2px;
+}
+
+.info-text small {
+   color: #718096;
+   font-size: 12px;
+}
+
+/* Product Description */
+.product-description {
+   background: white;
+   padding: 40px;
+   border-radius: 20px;
+   box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+   margin-bottom: 50px;
+}
+
+.product-description h3 {
+   color: #2d3748;
+   margin-bottom: 25px;
+   font-size: 1.5rem;
+}
+
+.description-content {
+   color: #4a5568;
+   line-height: 1.8;
+   font-size: 16px;
+}
+
+/* Related Products */
+.related-products {
+   background: white;
+   padding: 40px;
+   border-radius: 20px;
+   box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.related-products h3 {
+   color: #2d3748;
+   margin-bottom: 30px;
+   font-size: 1.5rem;
+   text-align: center;
+}
+
+.related-grid {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+   gap: 25px;
+}
+
+.related-item {
+   background: #f8fafc;
+   border-radius: 15px;
+   padding: 20px;
+   text-align: center;
+   transition: transform 0.3s;
+   border: 2px solid transparent;
+}
+
+.related-item:hover {
+   transform: translateY(-5px);
+   border-color: #667eea;
+   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
+}
+
+.related-item img {
+   width: 100%;
+   height: 200px;
+   object-fit: cover;
+   border-radius: 10px;
+   margin-bottom: 15px;
+}
+
+.related-item h4 {
+   color: #2d3748;
+   margin-bottom: 10px;
+   font-size: 1rem;
+}
+
+.related-item .price {
+   color: #e53e3e;
+   font-weight: 700;
+   font-size: 1.1rem;
+}
+
+.related-item a {
+   text-decoration: none;
+   color: inherit;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+   .product-main {
+       grid-template-columns: 1fr;
+       gap: 30px;
+   }
+   
+   .product-gallery {
+       position: static;
+   }
+   
+   .specs-modal-content {
+       max-width: 95vw;
+       margin: 10px;
+   }
+   
+   .specs-table {
+       font-size: 14px;
+   }
+   
+   .spec-label-col {
+       width: 35%;
+   }
+}
+
+@media (max-width: 768px) {
+   .single-product-container {
+       padding: 10px;
+   }
+   
+   .product-info {
+       padding: 20px;
+   }
+   
+   .product-title {
+       font-size: 1.5rem;
+   }
+   
+   .main-image {
+       height: 300px;
+   }
+   
+   .thumbnail {
+       width: 60px;
+       height: 60px;
+   }
+   
+   .action-buttons {
+       grid-template-columns: 1fr;
+       gap: 10px;
+   }
+   
+   .specs-modal-header {
+       padding: 20px;
+   }
+   
+   .specs-modal-header h2 {
+       font-size: 1.2rem;
+   }
+   
+   .specs-table-container {
+       padding: 15px;
+   }
+   
+   .spec-label-col,
+   .spec-value-col {
+       padding: 10px;
+   }
+   
+   .spec-label-col {
+       width: 40%;
+   }
+}
+
+@media (max-width: 480px) {
+   .product-main {
+       gap: 20px;
+   }
+   
+   .main-image {
+       height: 250px;
+   }
+   
+   .specs-modal-content {
+       margin: 5px;
+       border-radius: 10px;
+   }
+   
+   .specs-table {
+       font-size: 12px;
+   }
+   
+   .spec-label-col {
+       width: 45%;
+       padding: 8px;
+   }
+   
+   .spec-value-col {
+       padding: 8px;
+   }
+   
+   .specs-group-header {
+       font-size: 1.1rem;
+   }
+}
+
+/* Animation */
+.single-product-container {
+   animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+   from {
+       opacity: 0;
+       transform: translateY(30px);
+   }
+   to {
+       opacity: 1;
+       transform: translateY(0);
+   }
+}
 </style>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Modal functionality
+    const toggleBtn = document.getElementById('toggle-specs-btn');
+    const modal = document.getElementById('specs-modal');
+    const closeButtons = document.querySelectorAll('.specs-modal-close, .specs-modal-close-btn');
+    
+    // Open modal
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden'; // Prevent body scroll
+        });
+    }
+    
+    // Close modal
+    closeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto'; // Restore body scroll
+        });
+    });
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+    });
+    
+    // Close modal with ESC key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.style.display === 'flex') {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+    });
+    
+    // Gallery functionality
+    const mainImage = document.getElementById('main-product-image');
+    const thumbnails = document.querySelectorAll('.thumbnail');
+    const prevBtn = document.getElementById('prev-image');
+    const nextBtn = document.getElementById('next-image');
+    
+    let currentImageIndex = 0;
+    const imageUrls = Array.from(thumbnails).map(thumb => thumb.dataset.large);
+    
+    // Thumbnail click
+    thumbnails.forEach((thumb, index) => {
+        thumb.addEventListener('click', function() {
+            mainImage.src = this.dataset.large;
+            currentImageIndex = index;
+            updateActiveThumbnail(index);
+        });
+    });
+    
+    // Previous/Next buttons
+    if (prevBtn && nextBtn && imageUrls.length > 1) {
+        prevBtn.addEventListener('click', function() {
+            currentImageIndex = (currentImageIndex - 1 + imageUrls.length) % imageUrls.length;
+            mainImage.src = imageUrls[currentImageIndex];
+            updateActiveThumbnail(currentImageIndex);
+        });
+        
+        nextBtn.addEventListener('click', function() {
+            currentImageIndex = (currentImageIndex + 1) % imageUrls.length;
+            mainImage.src = imageUrls[currentImageIndex];
+            updateActiveThumbnail(currentImageIndex);
+        });
+    }
+    
+    function updateActiveThumbnail(index) {
+        thumbnails.forEach((thumb, i) => {
+            thumb.classList.toggle('active', i === index);
+        });
+    }
+    
+    // Quantity controls
+    const qtyMinus = document.querySelector('.qty-btn.minus');
+    const qtyPlus = document.querySelector('.qty-btn.plus');
+    const qtyInput = document.querySelector('.quantity-input input[name="quantity"]');
+    
+    if (qtyMinus && qtyPlus && qtyInput) {
+        qtyMinus.addEventListener('click', function() {
+            const currentValue = parseInt(qtyInput.value);
+            if (currentValue > 1) {
+                qtyInput.value = currentValue - 1;
+            }
+        });
+        
+        qtyPlus.addEventListener('click', function() {
+            const currentValue = parseInt(qtyInput.value);
+            const maxValue = parseInt(qtyInput.max) || 10;
+            if (currentValue < maxValue) {
+                qtyInput.value = currentValue + 1;
+            }
+        });
+    }
+});
+
 jQuery(document).ready(function($) {
     let currentImageIndex = 0;
     const images = [];
@@ -1454,6 +2555,32 @@ jQuery(document).ready(function($) {
            }
        }
    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('toggle-specs-btn');
+    const specsPreview = document.querySelector('.specs-preview');
+    const specsFull = document.querySelector('.specs-full');
+    const showText = document.querySelector('.show-text');
+    const hideText = document.querySelector('.hide-text');
+    
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+            if (specsFull.style.display === 'none') {
+                // Hiển thị đầy đủ
+                specsPreview.style.display = 'none';
+                specsFull.style.display = 'block';
+                showText.style.display = 'none';
+                hideText.style.display = 'inline';
+            } else {
+                // Thu gọn
+                specsPreview.style.display = 'block';
+                specsFull.style.display = 'none';
+                showText.style.display = 'inline';
+                hideText.style.display = 'none';
+            }
+        });
+    }
 });
 </script>
 

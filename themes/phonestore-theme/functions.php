@@ -2788,5 +2788,39 @@ function phonestore_show_debug_info() {
 }
 add_action('wp_footer', 'phonestore_show_debug_info');
 
-
+// Đảm bảo tất cả product attributes được hiển thị
+function phonestore_get_all_product_attributes($product_id) {
+    $attributes = array();
+    
+    // Lấy WooCommerce attributes
+    $product = wc_get_product($product_id);
+    if ($product) {
+        $wc_attributes = $product->get_attributes();
+        foreach ($wc_attributes as $attribute) {
+            $name = $attribute->get_name();
+            $name = str_replace('pa_', '', $name);
+            
+            if ($attribute->is_taxonomy()) {
+                $values = wc_get_product_terms($product_id, $attribute->get_name(), array('fields' => 'names'));
+                $value = implode(', ', $values);
+            } else {
+                $value = implode(', ', $attribute->get_options());
+            }
+            
+            if (!empty($value)) {
+                $attributes[$name] = $value;
+            }
+        }
+    }
+    
+    // Lấy custom fields
+    $meta_keys = get_post_meta($product_id);
+    foreach ($meta_keys as $key => $values) {
+        if (strpos($key, '_') !== 0 && !empty($values[0])) {
+            $attributes[$key] = $values[0];
+        }
+    }
+    
+    return $attributes;
+}
 ?>
