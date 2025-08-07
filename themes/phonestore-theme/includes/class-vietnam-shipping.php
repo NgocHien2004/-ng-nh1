@@ -52,20 +52,55 @@ class Vietnam_Shipping_Calculator extends WC_Shipping_Method {
     }
     
     public function calculate_shipping($package = array()) {
-        $customer_city = strtolower($package['destination']['city'] ?? '');
-        $customer_state = strtolower($package['destination']['state'] ?? '');
-        $customer_address = $this->get_customer_address($package);
-        
-        // Tính khoảng cách
-        $store_address = $this->get_option('store_address', 'Cái Răng, Cần Thơ, Việt Nam');
-        $distance = $this->calculate_distance($store_address, $customer_address);
-        
-        if ($distance !== false && $distance <= 30) {
-            $this->add_local_shipping_options($distance);
-        } else {
-            $this->add_viettel_post_options($customer_state);
-        }
+    $province = $package['destination']['state'] ?? '';
+    $district = $package['destination']['city'] ?? '';
+    $detail = $package['destination']['address_1'] ?? '';
+    
+    error_log("Shipping calculation - Province: $province, District: $district, Detail: $detail");
+    
+    if (empty($province) || empty($district)) {
+        // Hiển thị tất cả options nếu chưa chọn đủ thông tin
+        $this->add_all_shipping_options();
+        return;
     }
+    
+    // Tính khoảng cách với địa chỉ đầy đủ
+    $store_address = $this->get_option('store_address', 'Cái Răng, Cần Thơ, Việt Nam');
+    $customer_address = $this->get_customer_address($package);
+    $distance = $this->calculate_distance($store_address, $customer_address);
+    
+    error_log("Distance calculated: " . ($distance !== false ? $distance . "km" : "failed"));
+    
+    if ($distance !== false && $distance <= 30) {
+        $this->add_local_shipping_options($distance);
+    } else {
+        $this->add_viettel_post_options($province);
+    }
+}
+
+private function add_all_shipping_options() {
+    // Hiển thị tất cả các option khi chưa chọn địa chỉ
+    $this->add_rate(array(
+        'id' => $this->get_rate_id() . '_free',
+        'label' => '🚚 Ship nội thành (0-10km) - MIỄN PHÍ',
+        'cost' => 0,
+        'meta_data' => array('delivery_time' => 'Trong ngày')
+    ));
+    
+    $this->add_rate(array(
+        'id' => $this->get_rate_id() . '_medium',
+        'label' => '🚚 Ship ngoài thành (10-30km)',
+        'cost' => 25000,
+        'meta_data' => array('delivery_time' => '1-2 ngày')
+    ));
+    
+    $this->add_rate(array(
+        'id' => $this->get_rate_id() . '_far',
+        'label' => '🚚 Ship khác vùng miền (>30km)',
+        'cost' => 45000,
+        'meta_data' => array('delivery_time' => '3-5 ngày')
+    ));
+}
     
     private function add_local_shipping_options($distance) {
     // Ship nội thành (0-10km) - MIỄN PHÍ
@@ -126,6 +161,34 @@ private function add_viettel_post_options($customer_state) {
     }
     
     private function get_customer_address($package) {
-        // Copy từ class Distance_Based_Shipping
+    $address_parts = array();
+    
+    // Lấy thông tin từ dropdown và detail
+    $province = $package['destination']['state'] ?? '';     // Tỉnh/Thành phố
+    $district = $package['destination']['city'] ?? '';      // Quận/Huyện  
+    $detail = $package['destination']['address_1'] ?? '';   // Địa chỉ chi tiết
+    
+    // Xây dựng địa chỉ đầy đủ cho API
+    if (!empty($detail)) {
+        $address_parts[] = $detail;
     }
+    
+    if (!empty($district)) {
+        $address_parts[] = $district;
+    }
+    
+    if (!empty($province)) {
+        $address_parts[] = $province;
+    }
+    
+    $address_parts[] = 'Việt Nam';
+    
+    $full_address = implode(', ', $address_parts);
+    
+    // Log để debug
+    error_log("Customer address built: $full_address");
+    
+    return $full_address;
+}
+
 }

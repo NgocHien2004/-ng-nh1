@@ -2974,17 +2974,282 @@ add_action('woocommerce_shipping_init', 'phonestore_register_vietnam_shipping');
 add_filter('woocommerce_shipping_methods', 'phonestore_add_vietnam_shipping');
 
 
-// Kiểm tra API key OpenRouteService
-function phonestore_check_api_configuration() {
-    if (is_admin() && !defined('OPENROUTE_API_KEY')) {
-        add_action('admin_notices', function() {
-            echo '<div class="notice notice-warning is-dismissible">';
-            echo '<p><strong>PhoneStore:</strong> Chưa cấu hình OPENROUTE_API_KEY trong wp-config.php. Phí ship sẽ sử dụng mức cố định.</p>';
-            echo '</div>';
+// Include Vietnam provinces data
+require_once get_template_directory() . '/includes/vietnam-provinces.php';
+
+// Customize checkout fields với dropdown Tỉnh-Huyện
+function phonestore_customize_checkout_fields_dropdown($fields) {
+    // Get Vietnam provinces data
+    $provinces_data = get_vietnam_provinces_districts();
+    
+    // Tạo options cho tỉnh/thành phố
+    $province_options = array('' => 'Chọn Tỉnh/Thành phố');
+    foreach ($provinces_data as $province => $districts) {
+        $province_options[$province] = $province;
+    }
+    
+    // Billing fields labels
+    $fields['billing']['billing_first_name']['label'] = 'Họ *';
+    $fields['billing']['billing_last_name']['label'] = 'Tên *';
+    $fields['billing']['billing_email']['label'] = 'Email *';
+    $fields['billing']['billing_phone']['label'] = 'Số điện thoại *';
+    
+    // Thay đổi billing_state thành dropdown tỉnh/thành phố
+    $fields['billing']['billing_state'] = array(
+        'type' => 'select',
+        'label' => 'Tỉnh/Thành phố *',
+        'required' => true,
+        'class' => array('form-row-wide', 'address-field', 'update_totals_on_change'),
+        'options' => $province_options,
+        'priority' => 60
+    );
+    
+    // Thay đổi billing_city thành dropdown huyện/quận
+    $fields['billing']['billing_city'] = array(
+        'type' => 'select',
+        'label' => 'Quận/Huyện *',
+        'required' => true,
+        'class' => array('form-row-wide', 'address-field', 'update_totals_on_change'),
+        'options' => array('' => 'Chọn Quận/Huyện'),
+        'priority' => 70
+    );
+    
+    // Địa chỉ chi tiết với placeholder thông minh
+    $fields['billing']['billing_address_1'] = array(
+        'label' => 'Địa chỉ chi tiết *',
+        'placeholder' => 'Số nhà, tên đường, phường/xã...',
+        'required' => true,
+        'class' => array('form-row-wide', 'address-field'),
+        'priority' => 80
+    );
+    
+    // Hide các trường không cần thiết
+    unset($fields['billing']['billing_postcode']);
+    unset($fields['billing']['billing_country']);
+    unset($fields['billing']['billing_company']);
+    unset($fields['billing']['billing_address_2']);
+    
+    // Order notes
+    if (isset($fields['order']['order_comments'])) {
+        $fields['order']['order_comments']['label'] = 'Ghi chú đơn hàng (tùy chọn)';
+        $fields['order']['order_comments']['placeholder'] = 'Ghi chú về đơn hàng, ví dụ: ghi chú đặc biệt cho việc giao hàng...';
+    }
+    
+    return $fields;
+}
+add_filter('woocommerce_checkout_fields', 'phonestore_customize_checkout_fields_dropdown', 20);
+
+// Smart Address Autocomplete với OpenRouteService API
+function phonestore_smart_address_autocomplete() {
+    if (is_checkout()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            var provinces_data = <?php echo json_encode(get_vietnam_provinces_districts()); ?>;
+            
+            // Update districts dropdown
+            function updateDistricts() {
+                var selectedProvince = $('#billing_state').val();
+                var $districtSelect = $('#billing_city');
+                
+                $districtSelect.empty().append('<option value="">Chọn Quận/Huyện</option>');
+                
+                if (selectedProvince && provinces_data[selectedProvince]) {
+                    var districts = provinces_data[selectedProvince];
+                    $.each(districts, function(index, district) {
+                        $districtSelect.append('<option value="' + district + '">' + district + '</option>');
+                    });
+                }
+                
+                $('#billing_address_1').val('');
+                $('#address-suggestions').hide();
+            }
+            
+            // Setup address autocomplete
+            function setupAddressAutocomplete() {
+                let searchTimeout;
+                
+                $(document).on('input', '#billing_address_1', function() {
+                    const query = $(this).val();
+                    const $suggestions = $('#address-suggestions');
+                    const province = $('#billing_state').val();
+                    const district = $('#billing_city').val();
+                    
+                    if (query.length < 2) {
+                        $suggestions.hide();
+                        return;
+                    }
+                    
+                    if (!province || !district) {
+                        $suggestions.html('<div class="suggestion-notice">⚠️ Vui lòng chọn Tỉnh/Thành phố và Quận/Huyện trước</div>').show();
+                        return;
+                    }
+                    
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(function() {
+                        const contextualQuery = query + ', ' + district + ', ' + province + ', Việt Nam';
+                        
+                        $suggestions.html('<div class="suggestion-loading">🔍 Đang tìm kiếm...</div>').show();
+                        
+                        $.ajax({
+                            url: 'https://api.openrouteservice.org/geocode/search',
+                            method: 'GET',
+                            data: {
+                                api_key: '<?php echo defined('OPENROUTE_API_KEY') ? OPENROUTE_API_KEY : ''; ?>',
+                                text: contextualQuery,
+                                size: 6,
+                                layers: 'address,venue,street',
+                                'boundary.country': 'VN'
+                            },
+                            success: function(data) {
+                                let html = '<ul class="address-suggestions">';
+                                
+                                if (data.features && data.features.length > 0) {
+                                    data.features.forEach(function(feature) {
+                                        const label = feature.properties.label || feature.properties.name;
+                                        if (label && label.toLowerCase().includes(query.toLowerCase())) {
+                                            const shortAddress = extractShortAddress(label, province, district);
+                                            html += '<li class="suggestion-item" data-address="' + shortAddress + '">';
+                                            html += '<div class="suggestion-main">' + shortAddress + '</div>';
+                                            html += '<div class="suggestion-detail">' + label + '</div>';
+                                            html += '</li>';
+                                        }
+                                    });
+                                }
+                                
+                                // Option nhập thủ công
+                                html += '<li class="suggestion-item suggestion-manual" data-address="' + query + '">';
+                                html += '<div class="suggestion-main">✏️ Nhập thủ công: "' + query + '"</div>';
+                                html += '</li>';
+                                
+                                html += '</ul>';
+                                $suggestions.html(html).show();
+                            },
+                            error: function() {
+                                $suggestions.html(
+                                    '<div class="suggestion-error">' +
+                                    '<div class="suggestion-item suggestion-manual" data-address="' + query + '">✏️ Nhập: "' + query + '"</div>' +
+                                    '</div>'
+                                ).show();
+                            }
+                        });
+                    }, 400);
+                });
+            }
+            
+            // Extract short address
+            function extractShortAddress(fullAddress, province, district) {
+                let short = fullAddress;
+                if (district && short.includes(district)) {
+                    short = short.split(district)[0].trim();
+                }
+                if (province && short.includes(province)) {
+                    short = short.split(province)[0].trim();
+                }
+                return short.replace(/,\s*$/, '').trim() || fullAddress;
+            }
+            
+            // Event handlers
+            $(document).on('change', '#billing_state', function() {
+                updateDistricts();
+                $('body').trigger('update_checkout');
+            });
+            
+            $(document).on('change', '#billing_city', function() {
+                const province = $('#billing_state').val();
+                const district = $(this).val();
+                if (province && district) {
+                    $('#billing_address_1').attr('placeholder', 'Nhập địa chỉ tại ' + district + ', ' + province);
+                }
+                $('#billing_address_1').val('');
+                $('body').trigger('update_checkout');
+            });
+            
+            $(document).on('click', '.suggestion-item', function() {
+                const address = $(this).data('address');
+                $('#billing_address_1').val(address);
+                $('#address-suggestions').hide();
+                $('body').trigger('update_checkout');
+            });
+            
+            $(document).on('click', function(e) {
+                if (!$(e.target).closest('#billing_address_1, #address-suggestions').length) {
+                    $('#address-suggestions').hide();
+                }
+            });
+            
+            // Initialize
+            setupAddressAutocomplete();
+            if (!$('#address-suggestions').length) {
+                $('#billing_address_1').after('<div id="address-suggestions"></div>');
+            }
         });
+        </script>
+        
+        <style>
+        #address-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 2px;
+        }
+        
+        .address-suggestions {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .suggestion-item {
+            padding: 12px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .suggestion-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .suggestion-main {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .suggestion-detail {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
+        
+        .suggestion-manual {
+            background: #f0f8ff;
+            border-left: 3px solid #007cba;
+        }
+        
+        .suggestion-loading,
+        .suggestion-notice,
+        .suggestion-error {
+            padding: 12px 15px;
+            text-align: center;
+            color: #666;
+        }
+        
+        .woocommerce-checkout .form-row {
+            position: relative;
+        }
+        </style>
+        <?php
     }
 }
-add_action('admin_init', 'phonestore_check_api_configuration');
+add_action('wp_footer', 'phonestore_smart_address_autocomplete');
 
 // Đăng ký Vietnam shipping method
 function phonestore_register_vietnam_shipping() {
