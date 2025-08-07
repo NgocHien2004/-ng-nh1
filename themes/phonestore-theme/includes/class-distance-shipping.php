@@ -45,53 +45,100 @@ class Distance_Based_Shipping extends WC_Shipping_Method {
             'store_address' => array(
                 'title' => 'Địa chỉ cửa hàng',
                 'type' => 'textarea',
-                'description' => 'Địa chỉ đầy đủ của cửa hàng',
-                'default' => ''
-            ),
-            'free_distance' => array(
-                'title' => 'Khoảng cách miễn phí (km)',
-                'type' => 'number',
-                'description' => 'Miễn phí ship trong bán kính này',
-                'default' => '10'
-            ),
-            'rate_per_km' => array(
-                'title' => 'Giá mỗi km (VNĐ)',
-                'type' => 'number',
-                'description' => 'Phí ship mỗi km sau khoảng cách miễn phí',
-                'default' => '2000'
+                'description' => 'Địa chỉ đầy đủ của cửa hàng để tính khoảng cách',
+                'default' => 'Cái Răng, Cần Thơ, Việt Nam'
             )
         );
     }
     
     public function calculate_shipping($package = array()) {
-        $store_address = $this->get_option('store_address');
+        $customer_city = strtolower($package['destination']['city'] ?? '');
+        $customer_state = strtolower($package['destination']['state'] ?? '');
         $customer_address = $this->get_customer_address($package);
         
-        if (empty($store_address) || empty($customer_address)) {
-            return;
-        }
-        
+        // Tính khoảng cách
+        $store_address = $this->get_option('store_address', 'Cái Răng, Cần Thơ, Việt Nam');
         $distance = $this->calculate_distance($store_address, $customer_address);
         
-        if ($distance === false) {
-            // Nếu không tính được khoảng cách, sử dụng phí cố định
-            $cost = 30000; // 30k VNĐ
-            $label = $this->title . ' (Phí cố định)';
+        if ($distance !== false && $distance <= 30) {
+            // Giao hàng gần
+            $this->add_local_shipping_rate($distance);
         } else {
-            $cost = $this->calculate_shipping_cost($distance);
-            $label = $this->title . sprintf(' (%.1f km)', $distance);
+            // Giao hàng xa - Viettel Post
+            $this->add_viettel_post_rates($customer_state);
+        }
+    }
+    
+    private function add_local_shipping_rate($distance) {
+        if ($distance <= 10) {
+            $cost = 0;
+            $label = sprintf('🚚 Giao hàng miễn phí (%.1f km)', $distance);
+        } elseif ($distance <= 20) {
+            $cost = 15000;
+            $label = sprintf('🚚 Giao hàng gần (%.1f km) - 15,000đ', $distance);
+        } elseif ($distance <= 30) {
+            $cost = 25000;
+            $label = sprintf('🚚 Giao hàng trung (%.1f km) - 25,000đ', $distance);
+        } else {
+            $cost = 35000;
+            $label = sprintf('🚚 Giao hàng xa (%.1f km) - 35,000đ', $distance);
         }
         
-        $rate = array(
+        $this->add_rate(array(
             'id' => $this->get_rate_id(),
             'label' => $label,
             'cost' => $cost,
             'meta_data' => array(
-                'distance' => $distance
+                'distance' => $distance,
+                'delivery_time' => $distance <= 10 ? 'Trong ngày' : '1-2 ngày'
             )
+        ));
+    }
+    
+    private function add_viettel_post_rates($customer_state) {
+        $is_same_region = $this->is_same_region($customer_state);
+        
+        // Gói tiết kiệm
+        $economy_cost = $is_same_region ? 25000 : 35000;
+        $region_text = $is_same_region ? 'Cùng vùng' : 'Khác vùng';
+        
+        $this->add_rate(array(
+            'id' => $this->get_rate_id() . '_economy',
+            'label' => "📦 Viettel Post Tiết Kiệm ({$region_text}) - " . number_format($economy_cost) . 'đ',
+            'cost' => $economy_cost,
+            'meta_data' => array('delivery_time' => '3-5 ngày')
+        ));
+        
+        // Gói giao nhanh  
+        $express_cost = $is_same_region ? 40000 : 50000;
+        
+        $this->add_rate(array(
+            'id' => $this->get_rate_id() . '_express',
+            'label' => "⚡ Viettel Post Giao Nhanh ({$region_text}) - " . number_format($express_cost) . 'đ',
+            'cost' => $express_cost,
+            'meta_data' => array('delivery_time' => '1-2 ngày')
+        ));
+    }
+    
+    private function is_same_region($customer_state) {
+        $customer_state = strtolower($customer_state);
+        
+        // Miền Nam (cùng vùng với Cần Thơ)
+        $south_provinces = array(
+            'cần thơ', 'an giang', 'bạc liêu', 'bến tre', 'cà mau', 
+            'đồng tháp', 'hậu giang', 'kiên giang', 'long an', 
+            'sóc trăng', 'tiền giang', 'trà vinh', 'vĩnh long',
+            'hồ chí minh', 'bình dương', 'đồng nai', 'bà rịa vũng tàu',
+            'tây ninh', 'bình phước', 'bình thuận', 'ninh thuận'
         );
         
-        $this->add_rate($rate);
+        foreach ($south_provinces as $province) {
+            if (strpos($customer_state, $province) !== false) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     private function get_customer_address($package) {
@@ -117,18 +164,79 @@ class Distance_Based_Shipping extends WC_Shipping_Method {
     }
     
     private function calculate_distance($from, $to) {
-        $api_key = defined('GOOGLE_MAPS_API_KEY') ? GOOGLE_MAPS_API_KEY : '';
+        // Thử OpenRouteService trước
+        $distance = $this->calculate_distance_ors($from, $to);
+        
+        if ($distance !== false) {
+            return $distance;
+        }
+        
+        // Fallback về tính toán theo tọa độ
+        return $this->calculate_distance_coordinates($from, $to);
+    }
+    
+    private function calculate_distance_ors($from, $to) {
+        $api_key = defined('OPENROUTE_API_KEY') ? OPENROUTE_API_KEY : '';
         
         if (empty($api_key)) {
             return false;
         }
         
-        $from_encoded = urlencode($from);
-        $to_encoded = urlencode($to);
+        // Lấy tọa độ từ địa chỉ
+        $from_coords = $this->geocode_address($from, $api_key);
+        $to_coords = $this->geocode_address($to, $api_key);
         
-        $url = "https://maps.googleapis.com/maps/api/distancematrix/json?origins={$from_encoded}&destinations={$to_encoded}&key={$api_key}&units=metric";
+        if (!$from_coords || !$to_coords) {
+            return false;
+        }
         
-        $response = wp_remote_get($url, array('timeout' => 10));
+        // Tính khoảng cách bằng Matrix API
+        $url = "https://api.openrouteservice.org/v2/matrix/driving-car";
+        
+        $data = array(
+            'locations' => array(
+                array($from_coords['lng'], $from_coords['lat']),
+                array($to_coords['lng'], $to_coords['lat'])
+            ),
+            'metrics' => array('distance'),
+            'units' => 'km'
+        );
+        
+        $response = wp_remote_post($url, array(
+            'timeout' => 15,
+            'headers' => array(
+                'Authorization' => $api_key,
+                'Content-Type' => 'application/json'
+            ),
+            'body' => json_encode($data)
+        ));
+        
+        if (is_wp_error($response)) {
+            return false;
+        }
+        
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        
+        if (isset($body['distances'][0][1])) {
+            return floatval($body['distances'][0][1]);
+        }
+        
+        return false;
+    }
+    
+    private function geocode_address($address, $api_key) {
+        $url = "https://api.openrouteservice.org/geocode/search";
+        
+        $params = array(
+            'api_key' => $api_key,
+            'text' => $address,
+            'size' => 1,
+            'layers' => 'address'
+        );
+        
+        $url_with_params = $url . '?' . http_build_query($params);
+        
+        $response = wp_remote_get($url_with_params, array('timeout' => 10));
         
         if (is_wp_error($response)) {
             return false;
@@ -136,34 +244,59 @@ class Distance_Based_Shipping extends WC_Shipping_Method {
         
         $data = json_decode(wp_remote_retrieve_body($response), true);
         
-        if ($data['status'] !== 'OK' || 
-            !isset($data['rows'][0]['elements'][0]) || 
-            $data['rows'][0]['elements'][0]['status'] !== 'OK') {
+        if (isset($data['features'][0]['geometry']['coordinates'])) {
+            $coords = $data['features'][0]['geometry']['coordinates'];
+            return array(
+                'lng' => $coords[0],
+                'lat' => $coords[1]
+            );
+        }
+        
+        return false;
+    }
+    
+    private function calculate_distance_coordinates($from, $to) {
+        // Tọa độ cố định cho một số địa điểm ở Việt Nam
+        $coordinates = array(
+            'cần thơ' => array('lat' => 10.0452, 'lng' => 105.7469),
+            'hồ chí minh' => array('lat' => 10.8231, 'lng' => 106.6297),
+            'hà nội' => array('lat' => 21.0285, 'lng' => 105.8542),
+            'đà nẵng' => array('lat' => 16.0471, 'lng' => 108.2068),
+            'nha trang' => array('lat' => 12.2585, 'lng' => 109.0526),
+            'cái răng' => array('lat' => 10.0333, 'lng' => 105.7831)
+        );
+        
+        $from_lower = strtolower($from);
+        $to_lower = strtolower($to);
+        
+        $from_coords = null;
+        $to_coords = null;
+        
+        foreach ($coordinates as $place => $coords) {
+            if (strpos($from_lower, $place) !== false) {
+                $from_coords = $coords;
+            }
+            if (strpos($to_lower, $place) !== false) {
+                $to_coords = $coords;
+            }
+        }
+        
+        if (!$from_coords || !$to_coords) {
             return false;
         }
         
-        $distance_meters = $data['rows'][0]['elements'][0]['distance']['value'];
-        return $distance_meters / 1000; // Convert to km
-    }
-    
-    private function calculate_shipping_cost($distance) {
-        $free_distance = floatval($this->get_option('free_distance', 10));
-        $rate_per_km = floatval($this->get_option('rate_per_km', 2000));
+        // Tính khoảng cách theo công thức Haversine
+        $earth_radius = 6371;
         
-        if ($distance <= $free_distance) {
-            return 0; // Miễn phí
-        }
+        $lat_diff = deg2rad($to_coords['lat'] - $from_coords['lat']);
+        $lng_diff = deg2rad($to_coords['lng'] - $from_coords['lng']);
         
-        $chargeable_distance = $distance - $free_distance;
+        $a = sin($lat_diff/2) * sin($lat_diff/2) + 
+             cos(deg2rad($from_coords['lat'])) * cos(deg2rad($to_coords['lat'])) * 
+             sin($lng_diff/2) * sin($lng_diff/2);
+             
+        $c = 2 * atan2(sqrt($a), sqrt(1-$a));
         
-        // Áp dụng bảng giá theo tài liệu
-        if ($distance <= 20) {
-            return 15000; // 10-20km: 15,000đ
-        } elseif ($distance <= 30) {
-            return 25000; // 20-30km: 25,000đ
-        } else {
-            // Trên 30km: Viettel Post (tạm tính 35k)
-            return 35000;
-        }
+        return $earth_radius * $c;
     }
 }

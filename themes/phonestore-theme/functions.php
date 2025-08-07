@@ -3012,5 +3012,46 @@ function phonestore_single_product_footer_fix() {
 }
 add_action('wp_head', 'phonestore_single_product_footer_fix');
 
+// Đăng ký shipping methods
+function phonestore_register_shipping_methods() {
+    // Include class shipping hiện có
+    require_once get_template_directory() . '/includes/class-distance-shipping.php';
+}
+
+function phonestore_add_shipping_methods($methods) {
+    $methods['distance_based_shipping'] = 'Distance_Based_Shipping';
+    return $methods;
+}
+
+add_action('woocommerce_shipping_init', 'phonestore_register_shipping_methods');
+add_filter('woocommerce_shipping_methods', 'phonestore_add_shipping_methods');
+
+add_action('woocommerce_shipping_init', 'phonestore_register_shipping_methods');
+add_filter('woocommerce_shipping_methods', 'phonestore_add_shipping_methods');
+
+// Kiểm tra API key OpenRouteService
+function phonestore_check_api_configuration() {
+    if (is_admin() && !defined('OPENROUTE_API_KEY')) {
+        add_action('admin_notices', function() {
+            echo '<div class="notice notice-warning is-dismissible">';
+            echo '<p><strong>PhoneStore:</strong> Chưa cấu hình OPENROUTE_API_KEY trong wp-config.php. Phí ship sẽ sử dụng mức cố định.</p>';
+            echo '</div>';
+        });
+    }
+}
+add_action('admin_init', 'phonestore_check_api_configuration');
+
+// Đăng ký Vietnam shipping method
+function phonestore_register_vietnam_shipping() {
+    require_once get_template_directory() . '/includes/class-vietnam-shipping.php';
+}
+
+function phonestore_add_vietnam_shipping($methods) {
+    $methods['vietnam_shipping_calculator'] = 'Vietnam_Shipping_Calculator';
+    return $methods;
+}
+
+add_action('woocommerce_shipping_init', 'phonestore_register_vietnam_shipping');
+add_filter('woocommerce_shipping_methods', 'phonestore_add_vietnam_shipping');
 
 ?>
