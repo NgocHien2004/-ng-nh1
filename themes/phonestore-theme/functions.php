@@ -3166,4 +3166,48 @@ add_action('wp_loaded', 'phonestore_fix_checkout_errors');
 // Remove problematic hooks that cause argument count errors
 remove_all_actions('woocommerce_checkout_process');
 add_action('woocommerce_checkout_process', 'phonestore_checkout_field_validation');
+
+// Fix checkout payment methods
+function phonestore_fix_payment_methods() {
+    // Ensure payment gateways are loaded
+    if ( class_exists( 'WC_Payment_Gateways' ) ) {
+        WC()->payment_gateways();
+    }
+}
+add_action( 'init', 'phonestore_fix_payment_methods', 5 );
+
+// Remove all existing checkout validation hooks that cause errors
+remove_all_actions( 'woocommerce_checkout_process' );
+
+// Add proper checkout validation
+function phonestore_safe_checkout_validation() {
+    if ( ! isset( $_POST['billing_phone'] ) || empty( $_POST['billing_phone'] ) ) {
+        wc_add_notice( 'Số điện thoại là bắt buộc.', 'error' );
+    } elseif ( ! preg_match( '/^[0-9\-\+\s\(\)]+$/', $_POST['billing_phone'] ) ) {
+        wc_add_notice( 'Số điện thoại không hợp lệ.', 'error' );
+    }
+}
+add_action( 'woocommerce_checkout_process', 'phonestore_safe_checkout_validation' );
+
+// Ensure WooCommerce templates load properly
+function phonestore_ensure_woocommerce_templates() {
+    if ( ! function_exists( 'WC' ) ) {
+        return;
+    }
+    
+    // Force template loading
+    if ( is_checkout() && ! is_order_received_page() ) {
+        // Ensure cart is loaded
+        if ( ! WC()->cart ) {
+            wc_load_cart();
+        }
+        
+        // Ensure session is started
+        if ( ! WC()->session ) {
+            WC()->session = new WC_Session_Handler();
+            WC()->session->init();
+        }
+    }
+}
+add_action( 'template_redirect', 'phonestore_ensure_woocommerce_templates', 5 );
 ?>

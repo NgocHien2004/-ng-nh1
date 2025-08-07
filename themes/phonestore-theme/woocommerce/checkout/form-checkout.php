@@ -85,7 +85,7 @@ if ( ! $checkout->is_registration_enabled() && $checkout->is_registration_requir
     margin-bottom: 40px;
     padding: 30px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white; /* Sửa lỗi này */
+    color: white; /* Sửa từ "cthemes..." thành "white" */
     border-radius: 15px;
     box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
 }
