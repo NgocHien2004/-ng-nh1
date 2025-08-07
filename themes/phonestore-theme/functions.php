@@ -2964,7 +2964,7 @@ add_action('wp_head', 'phonestore_single_product_footer_fix');
 // Include Vietnam provinces data
 require_once get_template_directory() . '/includes/vietnam-provinces.php';
 
-// Customize checkout fields với dropdown Tỉnh-Huyện
+// Customize checkout fields với dropdown Tỉnh-Huyện - BỎ DROPDOWN HUYỆN
 function phonestore_customize_checkout_fields_dropdown($fields) {
     // Get Vietnam provinces data
     $provinces_data = get_vietnam_provinces_districts();
@@ -2981,23 +2981,23 @@ function phonestore_customize_checkout_fields_dropdown($fields) {
     $fields['billing']['billing_email']['label'] = 'Email *';
     $fields['billing']['billing_phone']['label'] = 'Số điện thoại *';
     
-    // Thay đổi billing_state thành dropdown tỉnh/thành phố
+    // CHỈ GIỮ dropdown tỉnh/thành phố
     $fields['billing']['billing_state'] = array(
         'type' => 'select',
         'label' => 'Tỉnh/Thành phố *',
         'required' => true,
-        'class' => array('form-row-wide', 'address-field', 'update_totals_on_change'),
+        'class' => array('form-row-wide', 'address-field'),
         'options' => $province_options,
         'priority' => 60
     );
     
-    // Thay đổi billing_city thành dropdown huyện/quận
+    // THAY ĐỔI: billing_city thành text input
     $fields['billing']['billing_city'] = array(
-        'type' => 'select',
-        'label' => 'Quận/Huyện *',
+        'type' => 'text',
+        'label' => 'Quận/Huyện/Thành phố *',
         'required' => true,
-        'class' => array('form-row-wide', 'address-field', 'update_totals_on_change'),
-        'options' => array('' => 'Chọn Quận/Huyện'),
+        'class' => array('form-row-wide', 'address-field'),
+        'placeholder' => 'Nhập quận/huyện/thành phố của bạn...',
         'priority' => 70
     );
     
@@ -3026,217 +3026,6 @@ function phonestore_customize_checkout_fields_dropdown($fields) {
 }
 add_filter('woocommerce_checkout_fields', 'phonestore_customize_checkout_fields_dropdown', 20);
 
-// Smart Address Autocomplete với OpenRouteService API
-function phonestore_smart_address_autocomplete() {
-    if (is_checkout()) {
-        ?>
-        <script type="text/javascript">
-        jQuery(document).ready(function($) {
-            var provinces_data = <?php echo json_encode(get_vietnam_provinces_districts()); ?>;
-            
-            // Update districts dropdown
-            function updateDistricts() {
-                var selectedProvince = $('#billing_state').val();
-                var $districtSelect = $('#billing_city');
-                
-                $districtSelect.empty().append('<option value="">Chọn Quận/Huyện</option>');
-                
-                if (selectedProvince && provinces_data[selectedProvince]) {
-                    var districts = provinces_data[selectedProvince];
-                    $.each(districts, function(index, district) {
-                        $districtSelect.append('<option value="' + district + '">' + district + '</option>');
-                    });
-                }
-                
-                $('#billing_address_1').val('');
-                $('#address-suggestions').hide();
-            }
-            
-            // Setup address autocomplete
-            function setupAddressAutocomplete() {
-                let searchTimeout;
-                
-                $(document).on('input', '#billing_address_1', function() {
-                    const query = $(this).val();
-                    const $suggestions = $('#address-suggestions');
-                    const province = $('#billing_state').val();
-                    const district = $('#billing_city').val();
-                    
-                    if (query.length < 2) {
-                        $suggestions.hide();
-                        return;
-                    }
-                    
-                    if (!province || !district) {
-                        $suggestions.html('<div class="suggestion-notice">⚠️ Vui lòng chọn Tỉnh/Thành phố và Quận/Huyện trước</div>').show();
-                        return;
-                    }
-                    
-                    clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(function() {
-                        const contextualQuery = query + ', ' + district + ', ' + province + ', Việt Nam';
-                        
-                        $suggestions.html('<div class="suggestion-loading">🔍 Đang tìm kiếm...</div>').show();
-                        
-                        $.ajax({
-                            url: 'https://api.openrouteservice.org/geocode/search',
-                            method: 'GET',
-                            data: {
-                                api_key: '<?php echo defined('OPENROUTE_API_KEY') ? OPENROUTE_API_KEY : ''; ?>',
-                                text: contextualQuery,
-                                size: 6,
-                                layers: 'address,venue,street',
-                                'boundary.country': 'VN'
-                            },
-                            success: function(data) {
-                                let html = '<ul class="address-suggestions">';
-                                
-                                if (data.features && data.features.length > 0) {
-                                    data.features.forEach(function(feature) {
-                                        const label = feature.properties.label || feature.properties.name;
-                                        if (label && label.toLowerCase().includes(query.toLowerCase())) {
-                                            const shortAddress = extractShortAddress(label, province, district);
-                                            html += '<li class="suggestion-item" data-address="' + shortAddress + '">';
-                                            html += '<div class="suggestion-main">' + shortAddress + '</div>';
-                                            html += '<div class="suggestion-detail">' + label + '</div>';
-                                            html += '</li>';
-                                        }
-                                    });
-                                }
-                                
-                                // Option nhập thủ công
-                                html += '<li class="suggestion-item suggestion-manual" data-address="' + query + '">';
-                                html += '<div class="suggestion-main">✏️ Nhập thủ công: "' + query + '"</div>';
-                                html += '</li>';
-                                
-                                html += '</ul>';
-                                $suggestions.html(html).show();
-                            },
-                            error: function() {
-                                $suggestions.html(
-                                    '<div class="suggestion-error">' +
-                                    '<div class="suggestion-item suggestion-manual" data-address="' + query + '">✏️ Nhập: "' + query + '"</div>' +
-                                    '</div>'
-                                ).show();
-                            }
-                        });
-                    }, 400);
-                });
-            }
-            
-            // Extract short address
-            function extractShortAddress(fullAddress, province, district) {
-                let short = fullAddress;
-                if (district && short.includes(district)) {
-                    short = short.split(district)[0].trim();
-                }
-                if (province && short.includes(province)) {
-                    short = short.split(province)[0].trim();
-                }
-                return short.replace(/,\s*$/, '').trim() || fullAddress;
-            }
-            
-            // Event handlers
-            $(document).on('change', '#billing_state', function() {
-                updateDistricts();
-                $('body').trigger('update_checkout');
-            });
-            
-            $(document).on('change', '#billing_city', function() {
-                const province = $('#billing_state').val();
-                const district = $(this).val();
-                if (province && district) {
-                    $('#billing_address_1').attr('placeholder', 'Nhập địa chỉ tại ' + district + ', ' + province);
-                }
-                $('#billing_address_1').val('');
-                $('body').trigger('update_checkout');
-            });
-            
-            $(document).on('click', '.suggestion-item', function() {
-                const address = $(this).data('address');
-                $('#billing_address_1').val(address);
-                $('#address-suggestions').hide();
-                $('body').trigger('update_checkout');
-            });
-            
-            $(document).on('click', function(e) {
-                if (!$(e.target).closest('#billing_address_1, #address-suggestions').length) {
-                    $('#address-suggestions').hide();
-                }
-            });
-            
-            // Initialize
-            setupAddressAutocomplete();
-            if (!$('#address-suggestions').length) {
-                $('#billing_address_1').after('<div id="address-suggestions"></div>');
-            }
-        });
-        </script>
-        
-        <style>
-        #address-suggestions {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 1000;
-            max-height: 300px;
-            overflow-y: auto;
-            margin-top: 2px;
-        }
-        
-        .address-suggestions {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-        }
-        
-        .suggestion-item {
-            padding: 12px 15px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .suggestion-item:hover {
-            background: #f8f9fa;
-        }
-        
-        .suggestion-main {
-            font-weight: 600;
-            color: #333;
-        }
-        
-        .suggestion-detail {
-            font-size: 12px;
-            color: #666;
-            margin-top: 2px;
-        }
-        
-        .suggestion-manual {
-            background: #f0f8ff;
-            border-left: 3px solid #007cba;
-        }
-        
-        .suggestion-loading,
-        .suggestion-notice,
-        .suggestion-error {
-            padding: 12px 15px;
-            text-align: center;
-            color: #666;
-        }
-        
-        .woocommerce-checkout .form-row {
-            position: relative;
-        }
-        </style>
-        <?php
-    }
-}
-add_action('wp_footer', 'phonestore_smart_address_autocomplete');
 
 // Đăng ký Vietnam shipping method
 function phonestore_register_vietnam_shipping() {
@@ -5218,119 +5007,6 @@ function phonestore_save_address_info() {
 add_action('wp_ajax_save_address_info', 'phonestore_save_address_info');
 add_action('wp_ajax_nopriv_save_address_info', 'phonestore_save_address_info');
 
-// JavaScript cho PHẦN 1 - Chỉ lưu địa chỉ
-function phonestore_address_saver_script() {
-    if (is_checkout()) {
-        ?>
-        <script type="text/javascript">
-        jQuery(document).ready(function($) {
-            var provinces_data = <?php echo json_encode(get_vietnam_provinces_districts()); ?>;
-            var saveTimer;
-            
-            console.log('=== ADDRESS SAVER LOADED ===');
-            
-            // Update districts dropdown
-            function updateDistricts() {
-                var selectedProvince = $('#billing_state').val();
-                var $districtSelect = $('#billing_city');
-                
-                $districtSelect.empty().append('<option value="">Chọn Quận/Huyện</option>');
-                
-                if (selectedProvince && provinces_data[selectedProvince]) {
-                    var districts = provinces_data[selectedProvince];
-                    $.each(districts, function(index, district) {
-                        $districtSelect.append('<option value="' + district + '">' + district + '</option>');
-                    });
-                }
-            }
-            
-            // Lưu địa chỉ với delay
-            function saveAddressInfo() {
-                var province = $('#billing_state').val();
-                var district = $('#billing_city').val();
-                
-                if (province && district && province !== '' && district !== '') {
-                    clearTimeout(saveTimer);
-                    saveTimer = setTimeout(function() {
-                        console.log('Saving address:', province, '-', district);
-                        
-                        $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
-                            action: 'save_address_info',
-                            province: province,
-                            district: district,
-                            security: '<?php echo wp_create_nonce('address-nonce'); ?>'
-                        }, function(response) {
-                            if (response.success) {
-                                console.log('Address saved successfully:', response.data);
-                                
-                                // Hiển thị notification nhỏ
-                                showAddressNotification(province, district);
-                                
-                                // Trigger tính shipping sau 1 giây
-                                setTimeout(function() {
-                                    triggerShippingCalculation();
-                                }, 1000);
-                            }
-                        }).fail(function() {
-                            console.log('Failed to save address');
-                        });
-                    }, 800);
-                }
-            }
-            
-            // Hiển thị thông báo đã lưu địa chỉ
-            function showAddressNotification(province, district) {
-                var notification = $('<div class="address-saved-notification">✅ Địa chỉ đã lưu: ' + district + ', ' + province + '</div>');
-                notification.css({
-                    'position': 'fixed',
-                    'top': '20px',
-                    'right': '20px',
-                    'background': '#28a745',
-                    'color': 'white',
-                    'padding': '10px 15px',
-                    'border-radius': '5px',
-                    'z-index': '9999',
-                    'font-size': '14px'
-                });
-                
-                $('body').append(notification);
-                
-                setTimeout(function() {
-                    notification.fadeOut(function() {
-                        notification.remove();
-                    });
-                }, 3000);
-            }
-            
-            // Trigger tính shipping
-            function triggerShippingCalculation() {
-                console.log('Triggering shipping calculation...');
-                $('#calculate-shipping-btn').trigger('click');
-            }
-            
-            // Event listeners
-            $(document).on('change', '#billing_state', function() {
-                console.log('Province changed:', $(this).val());
-                updateDistricts();
-                $('#billing_city').val(''); // Reset district
-            });
-            
-            $(document).on('change', '#billing_city', function() {
-                console.log('District changed:', $(this).val());
-                saveAddressInfo();
-            });
-            
-            // Initialize districts nếu đã có tỉnh được chọn
-            var currentProvince = $('#billing_state').val();
-            if (currentProvince) {
-                updateDistricts();
-            }
-        });
-        </script>
-        <?php
-    }
-}
-add_action('wp_footer', 'phonestore_address_saver_script', 5);
 
 // ===== PHẦN 2: TÍNH SHIPPING TỪ SESSION =====
 
@@ -5536,6 +5212,254 @@ function phonestore_reset_shipping() {
 }
 add_action('wp_ajax_reset_shipping', 'phonestore_reset_shipping');
 add_action('wp_ajax_nopriv_reset_shipping', 'phonestore_reset_shipping');
+
+// TẮT AUTO UPDATE TỪ DROPDOWN QUẬN/HUYỆN
+function phonestore_disable_dropdown_auto_update() {
+    if (is_checkout()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            console.log('🛑 Disabling dropdown auto updates...');
+            
+            // Tắt tất cả event listeners cũ
+            $(document).off('change', '#billing_state');
+            $(document).off('change', '#billing_city'); 
+            $(document).off('change', '#shipping_state');
+            $(document).off('change', '#shipping_city');
+            $(document).off('update_checkout');
+            $('body').off('update_checkout');
+            
+            // CHỈ giữ lại update districts dropdown, KHÔNG update checkout
+            $(document).on('change', '#billing_state', function() {
+                var selectedProvince = $(this).val();
+                var provinces_data = <?php echo json_encode(get_vietnam_provinces_districts()); ?>;
+                var $districtSelect = $('#billing_city');
+                
+                console.log('Province changed to:', selectedProvince);
+                
+                // Update districts dropdown
+                $districtSelect.empty().append('<option value="">Chọn Quận/Huyện</option>');
+                
+                if (selectedProvince && provinces_data[selectedProvince]) {
+                    var districts = provinces_data[selectedProvince];
+                    $.each(districts, function(index, district) {
+                        $districtSelect.append('<option value="' + district + '">' + district + '</option>');
+                    });
+                }
+                
+                // Reset district value
+                $districtSelect.val('');
+                
+                // LƯU VÀO SESSION mà KHÔNG update checkout
+                saveAddressToSession(selectedProvince, '');
+            });
+            
+            // Khi chọn district, chỉ lưu vào session
+            $(document).on('change', '#billing_city', function() {
+                var district = $(this).val();
+                var province = $('#billing_state').val();
+                
+                console.log('District changed to:', district);
+                
+                if (province && district) {
+                    saveAddressToSession(province, district);
+                }
+            });
+            
+            // Function lưu địa chỉ vào session mà KHÔNG trigger checkout update
+            function saveAddressToSession(province, district) {
+                if (province) {
+                    $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
+                        action: 'save_address_only',
+                        province: province,
+                        district: district,
+                        security: '<?php echo wp_create_nonce('save-address-nonce'); ?>'
+                    }, function(response) {
+                        console.log('Address saved to session:', province, district);
+                        // KHÔNG trigger update_checkout ở đây
+                    });
+                }
+            }
+            
+            console.log('✅ Dropdown auto updates disabled successfully');
+        });
+        </script>
+        <?php
+    }
+}
+add_action('wp_footer', 'phonestore_disable_dropdown_auto_update', 1);
+
+// AJAX handler chỉ lưu địa chỉ, KHÔNG tính phí
+function phonestore_save_address_only() {
+    check_ajax_referer('save-address-nonce', 'security');
+    
+    $province = sanitize_text_field($_POST['province']);
+    $district = sanitize_text_field($_POST['district']);
+    
+    // Chỉ lưu vào session, không làm gì khác
+    WC()->session->set('current_address', array(
+        'province' => $province,
+        'district' => $district,
+        'timestamp' => time()
+    ));
+    
+    // Cập nhật customer data (không trigger hooks)
+    if (WC()->customer) {
+        WC()->customer->set_billing_state($province);
+        if ($district) {
+            WC()->customer->set_billing_city($district);
+        }
+        WC()->customer->save();
+    }
+    
+    error_log("Address saved to session only: {$province} - {$district}");
+    
+    wp_send_json_success(array(
+        'province' => $province,
+        'district' => $district
+    ));
+}
+add_action('wp_ajax_save_address_only', 'phonestore_save_address_only');
+add_action('wp_ajax_nopriv_save_address_only', 'phonestore_save_address_only');
+
+// Function tính phí - lấy địa chỉ từ session và customer
+function phonestore_simple_shipping_fee() {
+    if (is_admin() && !defined('DOING_AJAX')) return;
+    if (!is_cart() && !is_checkout()) return;
+    
+    // Lấy phí đã tính từ session
+    $calculated_fee = WC()->session->get('final_shipping_fee');
+    
+    if ($calculated_fee !== null && $calculated_fee >= 0) {
+        // Xóa fees cũ
+        foreach (WC()->cart->get_fees() as $fee_key => $fee) {
+            if (strpos($fee->name, 'vận chuyển') !== false || strpos($fee->name, 'Phí') !== false) {
+                WC()->cart->remove_fee($fee_key);
+            }
+        }
+        
+        // Thêm fee nếu > 0
+        if ($calculated_fee > 0) {
+            WC()->cart->add_fee('Phí vận chuyển', $calculated_fee);
+        }
+        
+        error_log("Applied shipping fee from session: {$calculated_fee}");
+    }
+}
+
+// Form tính shipping - lấy địa chỉ từ session
+function phonestore_simple_shipping_form() {
+    if (!is_checkout()) return;
+    
+    // Xử lý form submit
+    if (isset($_POST['simple_shipping_submit']) && wp_verify_nonce($_POST['simple_nonce'], 'simple_action')) {
+        
+        // Lấy địa chỉ từ nhiều nguồn
+        $province = '';
+        $district = '';
+        
+        // 1. Từ session
+        $session_address = WC()->session->get('current_address');
+        if ($session_address) {
+            $province = $session_address['province'];
+            $district = $session_address['district'];
+        }
+        
+        // 2. Từ customer nếu session trống
+        if (empty($province) && WC()->customer) {
+            $province = WC()->customer->get_billing_state();
+            $district = WC()->customer->get_billing_city();
+        }
+        
+        // 3. Từ form hiện tại
+        if (empty($province)) {
+            $province = $_POST['current_province'] ?? '';
+            $district = $_POST['current_district'] ?? '';
+        }
+        
+        $shipping_type = $_POST['shipping_type'] ?? 'economy';
+        
+        if ($province && $district) {
+            $fee = phonestore_calculate_simple_fee($province, $district, $shipping_type);
+            
+            // Lưu kết quả
+            WC()->session->set('final_shipping_fee', $fee);
+            WC()->session->set('shipping_info', [
+                'province' => $province,
+                'district' => $district,
+                'type' => $shipping_type,
+                'fee' => $fee,
+                'calculated' => true
+            ]);
+            
+            error_log("Shipping calculated: {$fee} for {$district}, {$province}");
+        }
+    }
+    
+    // Lấy thông tin hiện tại
+    $shipping_info = WC()->session->get('shipping_info');
+    $current_address = WC()->session->get('current_address');
+    
+    // Lấy địa chỉ hiện tại từ form
+    $display_province = '';
+    $display_district = '';
+    
+    if ($current_address) {
+        $display_province = $current_address['province'];
+        $display_district = $current_address['district'];
+    } elseif (WC()->customer) {
+        $display_province = WC()->customer->get_billing_state();
+        $display_district = WC()->customer->get_billing_city();
+    }
+    
+    ?>
+    <div style="margin: 20px 0; padding: 15px; background: #f0f8ff; border: 1px solid #007cba; border-radius: 5px;">
+        <h4 style="margin: 0 0 15px 0;">🚚 Tính phí vận chuyển</h4>
+        
+        <?php if ($display_province): ?>
+        <div style="margin-bottom: 10px; padding: 8px; background: #e8f5e9; border-radius: 4px; font-size: 14px;">
+            📍 <strong>Địa chỉ hiện tại:</strong> <?php echo esc_html($display_district ? $display_district . ', ' . $display_province : $display_province); ?>
+        </div>
+        <?php else: ?>
+        <div style="margin-bottom: 10px; padding: 8px; background: #fff3e0; border-radius: 4px; font-size: 14px; color: #e65100;">
+            ⚠️ Vui lòng chọn Tỉnh/Thành phố và Quận/Huyện ở form trên trước
+        </div>
+        <?php endif; ?>
+        
+        <form method="post">
+            <?php wp_nonce_field('simple_action', 'simple_nonce'); ?>
+            
+            <!-- Hidden fields để truyền địa chỉ hiện tại -->
+            <input type="hidden" name="current_province" value="<?php echo esc_attr($display_province); ?>">
+            <input type="hidden" name="current_district" value="<?php echo esc_attr($display_district); ?>">
+            
+            <div style="margin-bottom: 10px;">
+                <label style="margin-right: 15px; display: inline-block;">
+                    <input type="radio" name="shipping_type" value="economy" checked> 📦 Tiết kiệm (3-5 ngày)
+                </label>
+                <label style="display: inline-block;">
+                    <input type="radio" name="shipping_type" value="express"> ⚡ Nhanh (1-2 ngày)
+                </label>
+            </div>
+            
+            <button type="submit" name="simple_shipping_submit" value="1" 
+                    <?php echo ($display_province && $display_district) ? '' : 'disabled'; ?>
+                    style="background: <?php echo ($display_province && $display_district) ? '#007cba' : '#cccccc'; ?>; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: <?php echo ($display_province && $display_district) ? 'pointer' : 'not-allowed'; ?>;">
+                🧮 Tính phí giao hàng
+            </button>
+        </form>
+        
+        <?php if ($shipping_info && isset($shipping_info['calculated'])): ?>
+        <div style="margin-top: 15px; padding: 10px; background: #e8f5e9; border-radius: 4px; border-left: 4px solid #4caf50;">
+            <div style="font-weight: bold; color: #2e7d32; margin-bottom: 5px;">✅ Phí vận chuyển đã tính:</div>
+            <div><strong>💰 Phí:</strong> <span style="color: #e74c3c; font-weight: bold; font-size: 16px;"><?php echo number_format($shipping_info['fee']); ?> ₫</span></div>
+            <div><strong>📍 Địa chỉ:</strong> <?php echo esc_html($shipping_info['district'] . ', ' . $shipping_info['province']); ?></div>
+            <div><strong>🚚 Loại:</strong> <?php echo $shipping_info['type'] === 'economy' ? 'Tiết kiệm (3-5 ngày)' : 'Nhanh (1-2 ngày)'; ?></div>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php
+}
 
 
 ?>
