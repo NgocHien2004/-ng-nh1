@@ -2677,4 +2677,29 @@ add_action('init', function() {
         exit;
     }
 });
+
+// Add compare button to product loop
+function phonestore_add_compare_button() {
+    global $product;
+    
+    if (!$product) return;
+    
+    $product_id = $product->get_id();
+    
+    echo '<button class="compare-btn" data-product-id="' . $product_id . '" title="Thêm vào so sánh">⚖️</button>';
+}
+
+// Hook compare button after add to cart button
+add_action('woocommerce_after_shop_loop_item', 'phonestore_add_compare_button', 15);
+
+// Wrap shop loop item buttons in container
+function phonestore_wrap_shop_buttons_start() {
+    echo '<div class="product-actions">';
+}
+add_action('woocommerce_after_shop_loop_item', 'phonestore_wrap_shop_buttons_start', 5);
+
+function phonestore_wrap_shop_buttons_end() {
+    echo '</div>';
+}
+add_action('woocommerce_after_shop_loop_item', 'phonestore_wrap_shop_buttons_end', 20);
 ?>

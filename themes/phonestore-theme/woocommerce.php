@@ -272,90 +272,183 @@ jQuery(document).ready(function($) {
     }
 });
 
-// Inject compare buttons into WooCommerce products
+// Handle compare functionality in shop
 $(document).ready(function() {
-    // Add compare buttons to product loop
-    $('.woocommerce .products li.product').each(function() {
-        const $product = $(this);
-        const productId = $product.find('.button').data('product_id') || 
-                         $product.find('a').attr('href').match(/\?add-to-cart=(\d+)/) ? 
-                         $product.find('a').attr('href').match(/\?add-to-cart=(\d+)/)[1] : 
-                         $product.find('.button').attr('href').match(/\?add-to-cart=(\d+)/) ?
-                         $product.find('.button').attr('href').match(/\?add-to-cart=(\d+)/)[1] : '';
-        
-        if (!$product.find('.product-actions').length) {
-            // Wrap existing button in actions container
-            const $addToCartBtn = $product.find('.button');
-            const $actionsContainer = $('<div class="product-actions"></div>');
-            
-            // Create compare button
-            const $compareBtn = $('<button class="compare-btn" data-product-id="' + productId + '">⚖️</button>');
-            
-            // Replace button area
-            $addToCartBtn.before($actionsContainer);
-            $actionsContainer.append($addToCartBtn);
-            $actionsContainer.append($compareBtn);
-        }
-    });
-    
     // Handle compare button clicks
     $(document).on('click', '.compare-btn', function(e) {
         e.preventDefault();
         e.stopPropagation();
         
-        const productId = $(this).data('product-id');
         const $btn = $(this);
+        const productId = $btn.data('product-id');
+        
+        if (!productId) {
+            console.log('No product ID found');
+            return;
+        }
+        
+        // Prevent double clicks
+        if ($btn.hasClass('processing')) {
+            return;
+        }
+        
+        $btn.addClass('processing');
         
         // Get current compare list
         let compareProducts = JSON.parse(localStorage.getItem('phonestore_compare') || '[]');
         
+        // Check maximum limit
         if (compareProducts.length >= 4) {
-            alert('Chỉ có thể so sánh tối đa 4 sản phẩm!');
+            showNotification('Chỉ có thể so sánh tối đa 4 sản phẩm!', 'warning');
+            $btn.removeClass('processing');
             return;
         }
         
-        if (!compareProducts.includes(productId)) {
-            compareProducts.push(productId);
-            localStorage.setItem('phonestore_compare', JSON.stringify(compareProducts));
-            
-            $btn.css('background', '#28a745').prop('disabled', true);
-            
-            alert('Đã thêm sản phẩm vào danh sách so sánh!');
-            
-            // Update compare notification
-            updateCompareNotification();
-        } else {
-            alert('Sản phẩm đã có trong danh sách so sánh!');
+        // Check if already added
+        if (compareProducts.includes(productId)) {
+            showNotification('Sản phẩm đã có trong danh sách so sánh!', 'info');
+            $btn.removeClass('processing');
+            return;
         }
+        
+        // Add to compare list
+        compareProducts.push(productId);
+        localStorage.setItem('phonestore_compare', JSON.stringify(compareProducts));
+        
+        // Update button state
+        $btn.removeClass('processing')
+            .addClass('added')
+            .css('background', 'linear-gradient(135deg, #28a745 0%, #20c997 100%)')
+            .html('✅');
+        
+        // Show success notification
+        showNotification('Đã thêm sản phẩm vào danh sách so sánh!', 'success');
+        
+        // Update compare notification counter
+        updateCompareNotification();
     });
     
-    // Update compare notification
+    // Initialize compare buttons state
+    function initCompareButtons() {
+        const compareProducts = JSON.parse(localStorage.getItem('phonestore_compare') || '[]');
+        
+        $('.compare-btn').each(function() {
+            const $btn = $(this);
+            const productId = $btn.data('product-id');
+            
+            if (compareProducts.includes(productId)) {
+                $btn.addClass('added')
+                    .css('background', 'linear-gradient(135deg, #28a745 0%, #20c997 100%)')
+                    .html('✅');
+            }
+        });
+    }
+    
+    // Show notification function
+    function showNotification(message, type = 'info') {
+        // Remove existing notifications
+        $('.shop-notification').remove();
+        
+        const icons = {
+            'success': '✅',
+            'warning': '⚠️',
+            'info': 'ℹ️',
+            'error': '❌'
+        };
+        
+        const colors = {
+            'success': 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+            'warning': 'linear-gradient(135deg, #ffc107 0%, #fd7e14 100%)',
+            'info': 'linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%)',
+            'error': 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)'
+        };
+        
+        const $notification = $('<div class="shop-notification shop-notification-' + type + '">' +
+            icons[type] + ' ' + message +
+            '</div>');
+        
+        $notification.css({
+            'position': 'fixed',
+            'top': '20px',
+            'right': '20px',
+            'background': colors[type],
+            'color': type === 'warning' ? '#333' : 'white',
+            'padding': '15px 20px',
+            'border-radius': '10px',
+            'box-shadow': '0 4px 15px rgba(0,0,0,0.2)',
+            'z-index': '9999',
+            'font-weight': '600',
+            'max-width': '400px',
+            'animation': 'slideInRight 0.3s ease'
+        });
+        
+        $('body').append($notification);
+        
+        // Auto remove after 3 seconds
+        setTimeout(function() {
+            $notification.fadeOut(300, function() {
+                $(this).remove();
+            });
+        }, 3000);
+    }
+    
+    // Update compare notification counter
     function updateCompareNotification() {
         const compareProducts = JSON.parse(localStorage.getItem('phonestore_compare') || '[]');
         const count = compareProducts.length;
         
+        // Remove existing notification
+        $('.compare-floating-notification').remove();
+        
         if (count > 0) {
-            if (!$('.compare-notification').length) {
-                $('body').append('<div class="compare-notification">So sánh (' + count + ')</div>');
-            } else {
-                $('.compare-notification').text('So sánh (' + count + ')');
-            }
+            const $compareNotification = $('<div class="compare-floating-notification">' +
+                '<span class="compare-icon">⚖️</span>' +
+                '<span class="compare-text">So sánh (' + count + ')</span>' +
+                '</div>');
             
-            $('.compare-notification').off('click').on('click', function() {
-                window.location.href = '/phonestore/so-sanh-san-pham/';
+            $compareNotification.css({
+                'position': 'fixed',
+                'bottom': '20px',
+                'right': '20px',
+                'background': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                'color': 'white',
+                'padding': '12px 20px',
+                'border-radius': '25px',
+                'box-shadow': '0 4px 15px rgba(102, 126, 234, 0.3)',
+                'cursor': 'pointer',
+                'z-index': '9998',
+                'display': 'flex',
+                'align-items': 'center',
+                'gap': '8px',
+                'font-weight': '600',
+                'transition': 'all 0.3s ease'
             });
+            
+            $compareNotification.on('click', function() {
+                window.location.href = '<?php echo home_url('/so-sanh-san-pham/'); ?>';
+            });
+            
+            $compareNotification.on('mouseenter', function() {
+                $(this).css('transform', 'translateY(-3px)');
+            }).on('mouseleave', function() {
+                $(this).css('transform', 'translateY(0)');
+            });
+            
+            $('body').append($compareNotification);
         }
     }
     
-    // Initialize compare notification
-    updateCompareNotification();
+    // Initialize when page loads
+    setTimeout(function() {
+        initCompareButtons();
+        updateCompareNotification();
+    }, 500);
     
-    // Mark already compared products
-    const compareProducts = JSON.parse(localStorage.getItem('phonestore_compare') || '[]');
-    compareProducts.forEach(function(productId) {
-        $(`.compare-btn[data-product-id="${productId}"]`)
-            .css('background', '#28a745')
-            .prop('disabled', true);
+    // Re-initialize after AJAX updates
+    $(document).on('updated_wc_div', function() {
+        setTimeout(function() {
+            initCompareButtons();
+        }, 500);
     });
 });
 </script>
@@ -1252,6 +1345,179 @@ $(document).ready(function() {
        height: 40px;
        font-size: 14px;
    }
+}
+
+/* === COMPARE BUTTONS FOR SHOP === */
+.product-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.shop-compare-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-width: 100px;
+}
+
+.shop-compare-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.shop-compare-btn.added {
+    background: #28a745 !important;
+    cursor: not-allowed;
+}
+
+.shop-compare-btn:disabled {
+    opacity: 0.8;
+    cursor: not-allowed;
+}
+
+/* Notification styles */
+.shop-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    z-index: 9999;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    animation: slideInRight 0.3s ease;
+}
+
+.shop-notification-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.shop-notification-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+    color: #333;
+}
+
+.shop-notification-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%);
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .product-actions {
+        flex-direction: column;
+    }
+    
+    .shop-compare-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .shop-notification {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        width: auto;
+    }
+}
+
+/* Compare notification animations */
+@keyframes slideInFromRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Compare button processing state */
+.compare-btn.processing {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.compare-btn.added {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+    color: white !important;
+    cursor: default;
+}
+
+/* Mobile responsive for notifications */
+@media (max-width: 768px) {
+    .compare-notification-popup {
+        top: 10px !important;
+        right: 10px !important;
+        left: 10px !important;
+        width: auto !important;
+        min-width: auto !important;
+    }
+    
+    .compare-notification {
+        bottom: 10px !important;
+        right: 10px !important;
+    }
+}
+
+/* Compare button animations */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Compare button states */
+.compare-btn.processing {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.compare-btn.added {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+    color: white !important;
+}
+
+/* Mobile responsive notifications */
+@media (max-width: 768px) {
+    .shop-notification {
+        top: 10px !important;
+        right: 10px !important;
+        left: 10px !important;
+        max-width: none !important;
+    }
+    
+    .compare-floating-notification {
+        bottom: 10px !important;
+        right: 10px !important;
+    }
 }
 </style>
 
