@@ -441,7 +441,12 @@ get_header(); ?>
         </div>
             
             <!-- Product Description -->
-            <div class="product-description">
+            
+        
+    <?php endwhile; ?>
+</div>
+                    </div>
+<div class="product-description">
                 <h3>📝 Mô tả sản phẩm</h3>
                 <div class="description-content">
                     <?php 
@@ -491,10 +496,6 @@ get_header(); ?>
                 </div>
             </div>
         </div>
-        
-    <?php endwhile; ?>
-</div>
-
 <style>
 /* Single Product Styles */
 .single-product-container {
