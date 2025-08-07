@@ -80,35 +80,85 @@ class Can_Tho_Distance_Shipping extends WC_Shipping_Method {
     }
     
     public function calculate_shipping($package = array()) {
-        if ($this->enabled !== 'yes') {
-            return;
-        }
-        
-        $customer_address = $this->get_customer_full_address($package);
-        $customer_province = strtolower($package['destination']['state'] ?? '');
-        
-        if (empty($customer_address) || empty($customer_province)) {
-            // Hiển thị tất cả options nếu chưa có địa chỉ đầy đủ
-            $this->add_all_shipping_options();
-            return;
-        }
-        
-        // Kiểm tra xem có phải giao hàng trong vùng Cần Thơ không
-        if ($this->is_can_tho_province($customer_province)) {
-            $distance = $this->calculate_distance_to_store($customer_address);
+    if ($this->enabled !== 'yes') {
+        return;
+    }
+    
+    $customer_province = strtolower($package['destination']['state'] ?? '');
+    $customer_city = strtolower($package['destination']['city'] ?? '');
+    $customer_address = $package['destination']['address_1'] ?? '';
+    
+    // Luôn hiển thị ít nhất một option để user có thể place order
+    if (empty($customer_province)) {
+        $this->add_default_shipping_options();
+        return;
+    }
+    
+    // Kiểm tra xem có phải giao hàng trong vùng Cần Thơ không
+    if ($this->is_can_tho_province($customer_province)) {
+        // Nếu có đầy đủ thông tin địa chỉ, tính khoảng cách
+        if (!empty($customer_city) && !empty($customer_address)) {
+            $full_address = $this->get_customer_full_address($package);
+            $distance = $this->calculate_distance_to_store($full_address);
             
             if ($distance !== false && $distance <= 30) {
                 $this->add_local_delivery_options($distance);
-            } else {
-                // Nếu trong Cần Thơ nhưng không tính được khoảng cách hoặc >30km
-                $this->add_viettel_post_options($customer_province);
+                return;
             }
-        } else {
-            // Giao hàng ngoài tỉnh - dùng Viettel Post
-            $this->add_viettel_post_options($customer_province);
         }
+        
+        // Fallback cho Cần Thơ khi thiếu thông tin hoặc khoảng cách > 30km
+        $this->add_can_tho_fallback_options();
+    } else {
+        // Giao hàng ngoài tỉnh - dùng Viettel Post
+        $this->add_viettel_post_options($customer_province);
     }
+}
+private function add_can_tho_fallback_options() {
+    // Options dự phòng cho Cần Thơ khi không tính được khoảng cách chính xác
+    $this->add_rate(array(
+        'id' => $this->get_rate_id() . '_canthofallback_free',
+        'label' => '🚴‍♂️ Giao hàng nội thành Cần Thơ - Miễn phí',
+        'cost' => 0,
+        'meta_data' => array(
+            'delivery_method' => 'store_delivery',
+            'delivery_time' => 'Giao trong ngày'
+        )
+    ));
     
+    $this->add_rate(array(
+        'id' => $this->get_rate_id() . '_canthofallback_near',
+        'label' => '🚗 Giao hàng ven thành Cần Thơ',
+        'cost' => 15000,
+        'meta_data' => array(
+            'delivery_method' => 'store_delivery',
+            'delivery_time' => '1-2 ngày'
+        )
+    ));
+    
+    $this->add_rate(array(
+        'id' => $this->get_rate_id() . '_canthofallback_far',
+        'label' => '🚛 Giao hàng xa Cần Thơ',
+        'cost' => 25000,
+        'meta_data' => array(
+            'delivery_method' => 'store_delivery',
+            'delivery_time' => '1-2 ngày'
+        )
+    ));
+}    
+
+private function add_default_shipping_options() {
+    // Hiển thị option mặc định khi chưa có thông tin tỉnh/thành phố
+    $this->add_rate(array(
+        'id' => $this->get_rate_id() . '_default',
+        'label' => '🚚 Phí vận chuyển (sẽ cập nhật khi nhập địa chỉ)',
+        'cost' => 25000,
+        'meta_data' => array(
+            'delivery_method' => 'pending',
+            'note' => 'Phí sẽ được tính lại khi có địa chỉ đầy đủ'
+        )
+    ));
+}
     private function is_can_tho_province($province) {
         $province = $this->normalize_province_name($province);
         return in_array($province, $this->can_tho_provinces);
@@ -359,4 +409,23 @@ class Can_Tho_Distance_Shipping extends WC_Shipping_Method {
             'meta_data' => array('delivery_method' => 'viettel_post', 'service_type' => 'express')
         ));
     }
+    // Thêm method này vào class Can_Tho_Distance_Shipping
+
+public function is_available($package) {
+    // Luôn available để tránh lỗi "no shipping methods"
+    return $this->enabled === 'yes';
+}
+
+private function add_emergency_fallback() {
+    // Fallback cuối cùng nếu tất cả đều fail
+    $this->add_rate(array(
+        'id' => $this->get_rate_id() . '_emergency',
+        'label' => '🚚 Giao hàng tiêu chuẩn',
+        'cost' => 25000,
+        'meta_data' => array(
+            'delivery_method' => 'standard',
+            'note' => 'Phí chuẩn cho mọi đơn hàng'
+        )
+    ));
+}
 }

@@ -5,6 +5,8 @@
  */
 
 // Enqueue styles và scripts
+
+require_once get_template_directory() . '/includes/shipping-debug.php';
 function phonestore_enqueue_styles() {
     wp_enqueue_style('phonestore-style', get_stylesheet_uri(), array(), '3.0.0');
     wp_enqueue_script('phonestore-script', get_template_directory_uri() . '/js/phonestore.js', array('jquery'), '3.0.0', true);
@@ -3786,4 +3788,326 @@ function phonestore_display_shipping_distance_in_admin($order) {
     }
 }
 add_action('woocommerce_admin_order_data_after_shipping_address', 'phonestore_display_shipping_distance_in_admin');
+// Xử lý validation địa chỉ shipping
+function phonestore_shipping_validation() {
+    // Cho phép place order ngay cả khi chưa có địa chỉ đầy đủ
+    // WooCommerce sẽ tự động yêu cầu địa chỉ cần thiết
+    return true;
+}
+add_filter('woocommerce_cart_needs_shipping_address', 'phonestore_shipping_validation');
+
+// Đảm bảo luôn có shipping option khả dụng
+function phonestore_ensure_shipping_available($rates, $package) {
+    if (empty($rates)) {
+        // Nếu không có shipping method nào, thêm option mặc định
+        $rates['fallback_shipping'] = new WC_Shipping_Rate(
+            'fallback_shipping',
+            'Giao hàng tiêu chuẩn',
+            25000,
+            array(),
+            'fallback_shipping'
+        );
+    }
+    return $rates;
+}
+add_filter('woocommerce_package_rates', 'phonestore_ensure_shipping_available', 10, 2);
+
+// Cập nhật JavaScript để xử lý tốt hơn
+function phonestore_improved_shipping_script() {
+    if (is_checkout() || is_cart()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            var updateTimeout;
+            
+            function updateShippingCalculation() {
+                clearTimeout(updateTimeout);
+                updateTimeout = setTimeout(function() {
+                    console.log('Updating shipping calculation...');
+                    $('body').trigger('update_checkout');
+                }, 1000);
+            }
+            
+            // Lắng nghe thay đổi địa chỉ
+            $(document).on('change keyup', '#billing_state, #shipping_state, #billing_city, #shipping_city, #billing_address_1, #shipping_address_1', function() {
+                updateShippingCalculation();
+            });
+            
+            // Xử lý khi không có shipping method
+            $(document).on('updated_checkout', function() {
+                var shippingMethods = $('input[name^="shipping_method"]');
+                
+                if (shippingMethods.length === 0) {
+                    console.log('No shipping methods found, triggering update...');
+                    setTimeout(function() {
+                        $('body').trigger('update_checkout');
+                    }, 2000);
+                }
+                
+                // Tự động chọn option đầu tiên nếu chưa có option nào được chọn
+                if (shippingMethods.length > 0 && !shippingMethods.is(':checked')) {
+                    shippingMethods.first().prop('checked', true).trigger('change');
+                }
+                
+                // Highlight miễn phí
+                $('label:contains("Miễn phí")').addClass('free-shipping-highlight');
+                
+                // Thêm class styling
+                shippingMethods.each(function() {
+                    var $this = $(this);
+                    var label = $this.next('label');
+                    var method = $this.val();
+                    
+                    if (method.includes('local') || method.includes('canthofallback')) {
+                        label.addClass('local-delivery');
+                    } else if (method.includes('viettel')) {
+                        label.addClass('viettel-delivery');
+                    }
+                });
+            });
+            
+            // Xử lý lỗi checkout
+            $(document).on('checkout_error', function() {
+                console.log('Checkout error detected, checking shipping...');
+                setTimeout(updateShippingCalculation, 1000);
+            });
+            
+            // Force update shipping khi load trang
+            setTimeout(function() {
+                if ($('input[name^="shipping_method"]').length === 0) {
+                    console.log('Force updating shipping on page load...');
+                    $('body').trigger('update_checkout');
+                }
+            }, 3000);
+        });
+        </script>
+        <?php
+    }
+}
+
+// Thay thế script cũ
+remove_action('wp_footer', 'phonestore_can_tho_shipping_script');
+add_action('wp_footer', 'phonestore_improved_shipping_script');
+
+// Tắt yêu cầu địa chỉ shipping bắt buộc
+function phonestore_disable_shipping_address_requirement() {
+    return false;
+}
+add_filter('woocommerce_cart_needs_shipping_address', 'phonestore_disable_shipping_address_requirement');
+
+// Tắt validation địa chỉ shipping
+function phonestore_remove_shipping_address_validation($fields) {
+    // Không yêu cầu shipping address nếu chỉ có billing address
+    if (isset($fields['shipping'])) {
+        foreach ($fields['shipping'] as $key => &$field) {
+            if (isset($field['required'])) {
+                $field['required'] = false;
+            }
+        }
+    }
+    return $fields;
+}
+add_filter('woocommerce_checkout_fields', 'phonestore_remove_shipping_address_validation');
+
+// Force sử dụng billing address cho shipping
+function phonestore_use_billing_for_shipping() {
+    if (is_checkout() && !is_order_received_page()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Ẩn checkbox "Ship to different address"
+            $('#ship-to-different-address-checkbox').prop('checked', false).closest('.woocommerce-shipping-fields').hide();
+            
+            // Force sử dụng billing address cho shipping
+            function copyBillingToShipping() {
+                if (!$('#ship-to-different-address-checkbox').is(':checked')) {
+                    $('#shipping_first_name').val($('#billing_first_name').val());
+                    $('#shipping_last_name').val($('#billing_last_name').val());
+                    $('#shipping_company').val($('#billing_company').val());
+                    $('#shipping_address_1').val($('#billing_address_1').val());
+                    $('#shipping_address_2').val($('#billing_address_2').val());
+                    $('#shipping_city').val($('#billing_city').val());
+                    $('#shipping_state').val($('#billing_state').val());
+                    $('#shipping_postcode').val($('#billing_postcode').val());
+                    $('#shipping_country').val($('#billing_country').val());
+                }
+            }
+            
+            // Copy khi có thay đổi billing
+            $('#billing_first_name, #billing_last_name, #billing_address_1, #billing_city, #billing_state').on('change keyup', function() {
+                copyBillingToShipping();
+                // Trigger update checkout để tính lại shipping
+                setTimeout(function() {
+                    $('body').trigger('update_checkout');
+                }, 500);
+            });
+            
+            // Copy ngay khi load
+            copyBillingToShipping();
+        });
+        </script>
+        
+        <style>
+        .woocommerce-shipping-fields {
+            display: none !important;
+        }
+        #ship-to-different-address-checkbox {
+            display: none !important;
+        }
+        </style>
+        <?php
+    }
+}
+add_action('wp_footer', 'phonestore_use_billing_for_shipping');
+
+// Đảm bảo shipping package có đủ thông tin
+function phonestore_force_shipping_calculation($packages) {
+    foreach ($packages as &$package) {
+        // Nếu shipping address trống, copy từ billing
+        if (empty($package['destination']['address_1']) && !empty($_POST['billing_address_1'])) {
+            $package['destination']['address_1'] = sanitize_text_field($_POST['billing_address_1']);
+        }
+        if (empty($package['destination']['city']) && !empty($_POST['billing_city'])) {
+            $package['destination']['city'] = sanitize_text_field($_POST['billing_city']);
+        }
+        if (empty($package['destination']['state']) && !empty($_POST['billing_state'])) {
+            $package['destination']['state'] = sanitize_text_field($_POST['billing_state']);
+        }
+        if (empty($package['destination']['country']) && !empty($_POST['billing_country'])) {
+            $package['destination']['country'] = sanitize_text_field($_POST['billing_country']);
+        }
+    }
+    return $packages;
+}
+add_filter('woocommerce_cart_shipping_packages', 'phonestore_force_shipping_calculation');
+
+// Tắt validation "Please enter an address to continue"
+function phonestore_disable_address_validation() {
+    return array();
+}
+add_filter('woocommerce_checkout_required_field_notice', 'phonestore_disable_address_validation');
+
+// Override WooCommerce checkout validation
+function phonestore_override_checkout_validation($data, $errors) {
+    // Loại bỏ lỗi về địa chỉ shipping
+    $error_codes = $errors->get_error_codes();
+    foreach ($error_codes as $code) {
+        if (strpos($code, 'shipping') !== false || strpos($code, 'address') !== false) {
+            $errors->remove($code);
+        }
+    }
+}
+add_action('woocommerce_after_checkout_validation', 'phonestore_override_checkout_validation', 10, 2);
+
+// Cập nhật script xử lý shipping
+function phonestore_final_shipping_script() {
+    if (is_checkout() || is_cart()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            var isUpdating = false;
+            
+            function updateShipping() {
+                if (isUpdating) return;
+                isUpdating = true;
+                
+                // Đảm bảo shipping = billing
+                if (!$('#ship-to-different-address-checkbox').is(':checked')) {
+                    $('#shipping_address_1').val($('#billing_address_1').val());
+                    $('#shipping_city').val($('#billing_city').val());
+                    $('#shipping_state').val($('#billing_state').val());
+                    $('#shipping_country').val($('#billing_country').val());
+                }
+                
+                setTimeout(function() {
+                    $('body').trigger('update_checkout');
+                    isUpdating = false;
+                }, 1000);
+            }
+            
+            // Lắng nghe thay đổi billing address
+            $(document).on('change', '#billing_address_1, #billing_city, #billing_state', function() {
+                updateShipping();
+            });
+            
+            // Xử lý khi checkout update xong
+            $(document).on('updated_checkout', function() {
+                // Tự động chọn shipping method đầu tiên
+                var shippingMethods = $('input[name^="shipping_method"]');
+                if (shippingMethods.length > 0 && !shippingMethods.is(':checked')) {
+                    shippingMethods.first().prop('checked', true);
+                }
+                
+                // Style cho shipping options
+                shippingMethods.each(function() {
+                    var $this = $(this);
+                    var label = $this.next('label');
+                    var labelText = label.text();
+                    
+                    if (labelText.includes('Miễn phí')) {
+                        label.addClass('free-shipping-highlight');
+                    } else if (labelText.includes('nội thành')) {
+                        label.addClass('local-delivery');
+                    } else if (labelText.includes('Viettel')) {
+                        label.addClass('viettel-delivery');
+                    }
+                });
+            });
+            
+            // Force update sau khi load trang
+            setTimeout(function() {
+                if ($('#billing_state').val() && $('#billing_city').val()) {
+                    updateShipping();
+                }
+            }, 2000);
+        });
+        </script>
+        <?php
+    }
+}
+
+// Thay thế tất cả script cũ
+remove_action('wp_footer', 'phonestore_improved_shipping_script');
+remove_action('wp_footer', 'phonestore_use_billing_for_shipping');
+add_action('wp_footer', 'phonestore_final_shipping_script');
+
+// Thêm CSS ẩn shipping fields
+function phonestore_hide_shipping_fields() {
+    if (is_checkout()) {
+        ?>
+        <style>
+        .woocommerce-shipping-fields,
+        #ship-to-different-address-checkbox,
+        .shipping_address {
+            display: none !important;
+        }
+        
+        .woocommerce-billing-fields {
+            width: 100% !important;
+        }
+        
+        .free-shipping-highlight {
+            background: linear-gradient(135deg, #28a745, #20c997) !important;
+            color: white !important;
+            padding: 8px 12px !important;
+            border-radius: 5px !important;
+            font-weight: bold !important;
+        }
+        
+        .local-delivery {
+            border-left: 3px solid #28a745;
+            padding-left: 10px;
+            background: #f8fff9;
+        }
+        
+        .viettel-delivery {
+            border-left: 3px solid #007cba;
+            padding-left: 10px;
+            background: #f0f8ff;
+        }
+        </style>
+        <?php
+    }
+}
+add_action('wp_head', 'phonestore_hide_shipping_fields');
 ?>
