@@ -3610,4 +3610,180 @@ function phonestore_address_autofill_script() {
     }
 }
 add_action('wp_footer', 'phonestore_address_autofill_script');
+
+// Đăng ký Can Tho shipping method
+function phonestore_register_can_tho_shipping() {
+    require_once get_template_directory() . '/includes/class-can-tho-shipping.php';
+    require_once get_template_directory() . '/includes/vietnam-districts-data.php';
+}
+
+function phonestore_add_can_tho_shipping($methods) {
+    $methods['can_tho_distance_shipping'] = 'Can_Tho_Distance_Shipping';
+    return $methods;
+}
+
+add_action('woocommerce_shipping_init', 'phonestore_register_can_tho_shipping');
+add_filter('woocommerce_shipping_methods', 'phonestore_add_can_tho_shipping');
+
+// Xóa phí ship cố định cũ và thay thế bằng phí động
+remove_action('woocommerce_cart_calculate_fees', 'phonestore_add_shipping_fee');
+
+// Thêm JavaScript để tính phí ship real-time
+function phonestore_can_tho_shipping_script() {
+    if (is_checkout() || is_cart()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Function để tính phí ship dựa trên địa chỉ
+            function calculateCanThoShipping() {
+                var city = $('#billing_city').val() || $('#shipping_city').val();
+                var state = $('#billing_state').val() || $('#shipping_state').val();
+                var address = $('#billing_address_1').val() || $('#shipping_address_1').val();
+                
+                if (city && state) {
+                    // Trigger update checkout để tính lại phí
+                    $('body').trigger('update_checkout');
+                }
+            }
+            
+            // Lắng nghe sự thay đổi địa chỉ
+            $(document).on('change', '#billing_city, #shipping_city, #billing_state, #shipping_state, #billing_address_1, #shipping_address_1', function() {
+                clearTimeout(window.shippingCalculateTimeout);
+                window.shippingCalculateTimeout = setTimeout(calculateCanThoShipping, 1500);
+            });
+            
+            // Hiển thị thông tin delivery method
+            $(document).on('updated_checkout', function() {
+                var shippingMethods = $('input[name^="shipping_method"]');
+                shippingMethods.each(function() {
+                    var $this = $(this);
+                    var label = $this.next('label');
+                    var method = $this.val();
+                    
+                    // Thêm class để styling
+                    if (method.includes('local')) {
+                        label.addClass('local-delivery');
+                    } else if (method.includes('viettel')) {
+                        label.addClass('viettel-delivery');
+                        if (method.includes('economy')) {
+                            label.addClass('economy-service');
+                        } else if (method.includes('express')) {
+                            label.addClass('express-service');
+                        }
+                    }
+                });
+                
+                // Highlight miễn phí
+                $('label:contains("Miễn phí")').addClass('free-shipping-highlight');
+            });
+            
+            // Hiển thị thông báo khi chọn giao hàng miễn phí
+            $(document).on('change', 'input[name^="shipping_method"]', function() {
+                var selectedMethod = $(this).val();
+                var label = $(this).next('label').text();
+                
+                if (label.includes('Miễn phí')) {
+                    if (!$('.free-shipping-notice').length) {
+                        $(this).closest('tr').after('<tr class="free-shipping-notice"><td colspan="2"><div class="notice notice-success"><p>🎉 <strong>Chúc mừng!</strong> Bạn được giao hàng miễn phí vì ở gần cửa hàng!</p></div></td></tr>');
+                    }
+                } else {
+                    $('.free-shipping-notice').remove();
+                }
+            });
+        });
+        </script>
+        
+        <style>
+        .local-delivery {
+            border-left: 3px solid #28a745;
+            padding-left: 10px;
+            background: #f8fff9;
+        }
+        
+        .viettel-delivery {
+            border-left: 3px solid #007cba;
+            padding-left: 10px;
+            background: #f0f8ff;
+        }
+        
+        .free-shipping-highlight {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white !important;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .express-service {
+            position: relative;
+        }
+        
+        .express-service:after {
+            content: "NHANH";
+            position: absolute;
+            top: -5px;
+            right: 5px;
+            background: #dc3545;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        
+        .economy-service {
+            position: relative;
+        }
+        
+        .economy-service:after {
+            content: "TIẾT KIỆM";
+            position: absolute;
+            top: -5px;
+            right: 5px;
+            background: #17a2b8;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        
+        .free-shipping-notice .notice {
+            margin: 10px 0;
+            padding: 10px;
+        }
+        </style>
+        <?php
+    }
+}
+add_action('wp_footer', 'phonestore_can_tho_shipping_script');
+
+// Thêm thông tin khoảng cách vào order meta
+function phonestore_save_shipping_distance($order_id) {
+    if (!$order_id) return;
+    
+    $order = wc_get_order($order_id);
+    $shipping_methods = $order->get_shipping_methods();
+    
+    foreach ($shipping_methods as $shipping_method) {
+        $meta_data = $shipping_method->get_meta_data();
+        foreach ($meta_data as $meta) {
+            if ($meta->key === 'distance') {
+                $order->update_meta_data('_shipping_distance', $meta->value);
+                $order->save();
+                break;
+            }
+        }
+    }
+}
+add_action('woocommerce_checkout_order_processed', 'phonestore_save_shipping_distance');
+
+// Hiển thị khoảng cách trong admin order
+function phonestore_display_shipping_distance_in_admin($order) {
+    $distance = $order->get_meta('_shipping_distance');
+    if ($distance) {
+        echo '<p><strong>Khoảng cách giao hàng:</strong> ' . round($distance, 1) . ' km</p>';
+    }
+}
+add_action('woocommerce_admin_order_data_after_shipping_address', 'phonestore_display_shipping_distance_in_admin');
 ?>
