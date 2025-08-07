@@ -255,3 +255,90 @@ jQuery(document).ready(function ($) {
         `);
   }
 });
+
+// Related Products Slider
+document.addEventListener("DOMContentLoaded", function () {
+  const slider = document.getElementById("related-slider");
+  const prevBtn = document.getElementById("related-prev");
+  const nextBtn = document.getElementById("related-next");
+
+  if (!slider || !prevBtn || !nextBtn) return;
+
+  const items = slider.querySelectorAll(".related-item");
+  const itemWidth = 270; // width + gap
+  const visibleItems = Math.floor(slider.parentElement.offsetWidth / itemWidth);
+  const maxScroll = Math.max(0, (items.length - visibleItems) * itemWidth);
+
+  let currentScroll = 0;
+
+  function updateButtons() {
+    prevBtn.disabled = currentScroll <= 0;
+    nextBtn.disabled = currentScroll >= maxScroll;
+  }
+
+  function updateSlider() {
+    slider.style.transform = `translateX(-${currentScroll}px)`;
+    updateButtons();
+  }
+
+  prevBtn.addEventListener("click", function () {
+    if (currentScroll > 0) {
+      currentScroll = Math.max(0, currentScroll - itemWidth * 2);
+      updateSlider();
+    }
+  });
+
+  nextBtn.addEventListener("click", function () {
+    if (currentScroll < maxScroll) {
+      currentScroll = Math.min(maxScroll, currentScroll + itemWidth * 2);
+      updateSlider();
+    }
+  });
+
+  // Touch/Swipe support for mobile
+  let startX = 0;
+  let currentX = 0;
+  let isDragging = false;
+
+  slider.addEventListener("touchstart", function (e) {
+    startX = e.touches[0].clientX;
+    isDragging = true;
+  });
+
+  slider.addEventListener("touchmove", function (e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    currentX = e.touches[0].clientX;
+  });
+
+  slider.addEventListener("touchend", function (e) {
+    if (!isDragging) return;
+    isDragging = false;
+
+    const diff = startX - currentX;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0 && currentScroll < maxScroll) {
+        // Swipe left - next
+        currentScroll = Math.min(maxScroll, currentScroll + itemWidth);
+      } else if (diff < 0 && currentScroll > 0) {
+        // Swipe right - prev
+        currentScroll = Math.max(0, currentScroll - itemWidth);
+      }
+      updateSlider();
+    }
+  });
+
+  // Initialize
+  updateSlider();
+
+  // Update on window resize
+  window.addEventListener("resize", function () {
+    const newVisibleItems = Math.floor(slider.parentElement.offsetWidth / itemWidth);
+    const newMaxScroll = Math.max(0, (items.length - newVisibleItems) * itemWidth);
+
+    if (currentScroll > newMaxScroll) {
+      currentScroll = newMaxScroll;
+    }
+    updateSlider();
+  });
+});
