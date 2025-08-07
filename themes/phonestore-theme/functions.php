@@ -2562,4 +2562,119 @@ function phonestore_single_product_template($template) {
     return $template;
 }
 add_filter('template_include', 'phonestore_single_product_template', 99);
+
+// Đảm bảo WooCommerce hoạt động đúng
+function phonestore_fix_woocommerce_pages() {
+    // Flush rewrite rules khi cần
+    if (get_option('phonestore_flush_rules') !== 'done') {
+        flush_rewrite_rules();
+        update_option('phonestore_flush_rules', 'done');
+    }
+}
+add_action('after_switch_theme', 'phonestore_fix_woocommerce_pages');
+
+// Đảm bảo shop page hoạt động
+function phonestore_fix_shop_page($template) {
+    if (is_shop() && file_exists(get_template_directory() . '/woocommerce.php')) {
+        return get_template_directory() . '/woocommerce.php';
+    }
+    return $template;
+}
+add_filter('template_include', 'phonestore_fix_shop_page', 999);
+
+// Sửa lỗi permalink và rewrite rules
+function phonestore_fix_permalink_issues() {
+    // Force flush rewrite rules khi cần
+    if (!get_option('phonestore_permalinks_fixed')) {
+        flush_rewrite_rules(false);
+        update_option('phonestore_permalinks_fixed', true);
+    }
+}
+add_action('init', 'phonestore_fix_permalink_issues');
+
+// Đảm bảo WooCommerce product links hoạt động đúng
+function phonestore_fix_woocommerce_permalinks() {
+    global $wp_rewrite;
+    
+    // Đảm bảo WooCommerce rewrite rules được load
+    if (class_exists('WooCommerce')) {
+        WC()->query->init_query_vars();
+        WC()->query->add_endpoints();
+    }
+}
+add_action('init', 'phonestore_fix_woocommerce_permalinks', 999);
+
+// Xóa index.php khỏi URL
+function phonestore_remove_index_php($permalink) {
+    $permalink = str_replace('/index.php/', '/', $permalink);
+    $permalink = str_replace('index.php/', '', $permalink);
+    return $permalink;
+}
+add_filter('user_trailingslashit', 'phonestore_remove_index_php');
+add_filter('home_url', 'phonestore_remove_index_php');
+add_filter('site_url', 'phonestore_remove_index_php');
+
+// Force WooCommerce sử dụng clean URLs
+function phonestore_clean_product_urls($permalink, $post) {
+    // Kiểm tra an toàn trước khi truy cập thuộc tính
+    if (is_object($post) && isset($post->post_type) && $post->post_type == 'product') {
+        $permalink = str_replace('index.php/', '', $permalink);
+        $permalink = str_replace('//', '/', $permalink);
+    }
+    return $permalink;
+}
+add_filter('post_link', 'phonestore_clean_product_urls', 10, 2);
+add_filter('page_link', 'phonestore_clean_product_urls', 10, 2);
+
+// Đảm bảo single product template được load đúng
+function phonestore_force_single_product_template($template) {
+    global $post;
+    
+    // Kiểm tra an toàn
+    if (is_single() && is_object($post) && isset($post->post_type) && $post->post_type == 'product') {
+        $single_template = locate_template('woocommerce/single-product.php');
+        if ($single_template) {
+            return $single_template;
+        }
+    }
+    
+    return $template;
+}
+add_filter('single_template', 'phonestore_force_single_product_template', 999);
+
+// Debug permalinks
+add_action('wp_footer', function() {
+    if (current_user_can('administrator') && isset($_GET['debug_urls'])) {
+        echo '<div style="position:fixed;bottom:0;left:0;background:white;padding:10px;border:2px solid red;z-index:99999;">';
+        echo '<strong>Debug URLs:</strong><br>';
+        echo 'Home: ' . home_url() . '<br>';
+        echo 'Shop: ' . (class_exists('WooCommerce') ? wc_get_page_permalink('shop') : 'No WC') . '<br>';
+        
+        if (is_product()) {
+            global $product;
+            echo 'Product URL: ' . get_permalink($product->get_id()) . '<br>';
+            echo 'Product ID: ' . $product->get_id() . '<br>';
+        }
+        echo '</div>';
+    }
+});
+
+// Reset permalinks hoàn toàn - chỉ chạy 1 lần
+add_action('init', function() {
+    if (isset($_GET['reset_permalinks']) && current_user_can('administrator')) {
+        delete_option('rewrite_rules');
+        global $wp_rewrite;
+        $wp_rewrite->set_permalink_structure('/%postname%/');
+        $wp_rewrite->flush_rules(true);
+        
+        // Reset WooCommerce
+        if (class_exists('WooCommerce')) {
+            delete_option('woocommerce_permalinks');
+            WC_Install::create_pages();
+        }
+        
+        echo '<h1>Permalinks đã được reset! <a href="' . home_url() . '">Quay lại trang chủ</a></h1>';
+        exit;
+    }
+});
 ?>
