@@ -89,14 +89,32 @@ defined( 'ABSPATH' ) || exit;
 		<?php 
 // Hiển thị thông tin khoảng cách trước fees
 phonestore_add_shipping_info_to_totals();
-
 foreach ( WC()->cart->get_fees() as $fee ) : ?>
-	<tr class="fee">
-		<th>🚚 <?php echo esc_html( $fee->name ); ?></th>
-		<td><?php wc_cart_totals_fee_html( $fee ); ?></td>
-	</tr>
+    <tr class="fee">
+        <th>🚚 <?php echo esc_html( $fee->name ); ?></th>
+        <td><?php wc_cart_totals_fee_html( $fee ); ?></td>
+    </tr>
 <?php endforeach; ?>
 
+<?php 
+// Hiển thị thông tin chi tiết shipping
+$shipping_info = WC()->session->get('shipping_info');
+if ($shipping_info): 
+    $type_text = $shipping_info['type'] === 'economy' ? 'Tiết kiệm' : 'Nhanh';
+    if ($shipping_info['fee'] === 0) {
+        $desc = 'Miễn phí giao hàng nội thành Cần Thơ';
+    } elseif ($shipping_info['fee'] === 25000) {
+        $desc = 'Giao hàng ngoại thành Cần Thơ';
+    } else {
+        $desc = 'Giao hàng khác tỉnh - ' . $type_text;
+    }
+?>
+    <tr class="shipping-detail" style="font-size: 12px;">
+        <th colspan="2" style="text-align: left; color: #666; font-weight: normal; padding: 5px 12px;">
+            📍 <?php echo esc_html($desc); ?>
+        </th>
+    </tr>
+<?php endif; ?>
 		<?php if ( wc_tax_enabled() && ! WC()->cart->display_prices_including_tax() ) : ?>
 			<?php if ( 'itemized' === get_option( 'woocommerce_tax_total_display' ) ) : ?>
 				<?php foreach ( WC()->cart->get_tax_totals() as $code => $tax ) : // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited ?>
