@@ -4110,4 +4110,315 @@ function phonestore_hide_shipping_fields() {
     }
 }
 add_action('wp_head', 'phonestore_hide_shipping_fields');
+
+// Cập nhật script hiển thị shipping options
+function phonestore_shipping_options_script() {
+    if (is_checkout() || is_cart()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            var isUpdating = false;
+            
+            function updateShipping() {
+                if (isUpdating) return;
+                isUpdating = true;
+                
+                // Copy billing sang shipping
+                $('#shipping_address_1').val($('#billing_address_1').val());
+                $('#shipping_city').val($('#billing_city').val());
+                $('#shipping_state').val($('#billing_state').val());
+                $('#shipping_country').val($('#billing_country').val());
+                
+                setTimeout(function() {
+                    $('body').trigger('update_checkout');
+                    isUpdating = false;
+                }, 1500);
+            }
+            
+            // Lắng nghe thay đổi address
+            $(document).on('change', '#billing_address_1, #billing_city, #billing_state', function() {
+                clearTimeout(window.shippingUpdateTimeout);
+                window.shippingUpdateTimeout = setTimeout(updateShipping, 1000);
+            });
+            
+            // Xử lý khi checkout update
+            $(document).on('updated_checkout', function() {
+                var shippingMethods = $('input[name^="shipping_method"]');
+                
+                // Tự động chọn option đầu tiên nếu chưa chọn
+                if (shippingMethods.length > 0 && !shippingMethods.is(':checked')) {
+                    shippingMethods.first().prop('checked', true);
+                }
+                
+                // Style cho shipping options
+                shippingMethods.each(function() {
+                    var $this = $(this);
+                    var label = $this.next('label');
+                    var labelText = label.text();
+                    var method = $this.val();
+                    
+                    // Reset classes
+                    label.removeClass('free-shipping local-delivery viettel-delivery economy-service express-service');
+                    
+                    if (labelText.includes('Miễn phí')) {
+                        label.addClass('free-shipping');
+                    } else if (method.includes('local') || method.includes('cantho')) {
+                        label.addClass('local-delivery');
+                    } else if (method.includes('viettel')) {
+                        label.addClass('viettel-delivery');
+                        if (method.includes('economy')) {
+                            label.addClass('economy-service');
+                        } else if (method.includes('express')) {
+                            label.addClass('express-service');
+                        }
+                    }
+                });
+                
+                // Hiển thị breakdown cost cho Viettel Post
+                $('.shipping-cost-breakdown').remove();
+                shippingMethods.filter(':checked').each(function() {
+                    var method = $(this).val();
+                    if (method.includes('viettel')) {
+                        var breakdown = '';
+                        if (method.includes('economy')) {
+                            breakdown = '<div class="shipping-cost-breakdown"><small>Phí cơ bản + 5,000đ phí tiết kiệm</small></div>';
+                        } else if (method.includes('express')) {
+                            breakdown = '<div class="shipping-cost-breakdown"><small>Phí cơ bản + 10,000đ phí nhanh</small></div>';
+                        }
+                        $(this).closest('li').append(breakdown);
+                    }
+                });
+            });
+            
+            // Hiển thị breakdown khi chọn shipping method
+            $(document).on('change', 'input[name^="shipping_method"]', function() {
+                $('.shipping-cost-breakdown').remove();
+                var method = $(this).val();
+                if (method.includes('viettel')) {
+                    var breakdown = '';
+                    if (method.includes('economy')) {
+                        breakdown = '<div class="shipping-cost-breakdown"><small style="color: #666; font-style: italic;">Bao gồm: Phí cơ bản + 5,000đ phí tiết kiệm</small></div>';
+                    } else if (method.includes('express')) {
+                        breakdown = '<div class="shipping-cost-breakdown"><small style="color: #666; font-style: italic;">Bao gồm: Phí cơ bản + 10,000đ phí nhanh</small></div>';
+                    }
+                    $(this).closest('li').append(breakdown);
+                }
+            });
+            
+            // Force update sau khi load
+            setTimeout(function() {
+                if ($('#billing_state').val() && $('#billing_city').val()) {
+                    updateShipping();
+                }
+            }, 2000);
+        });
+        </script>
+        <?php
+    }
+}
+
+// Thay thế script cũ
+remove_action('wp_footer', 'phonestore_final_shipping_script');
+add_action('wp_footer', 'phonestore_shipping_options_script');
+
+// Cập nhật CSS cho shipping options
+function phonestore_shipping_options_css() {
+    if (is_checkout()) {
+        ?>
+        <style>
+        .free-shipping {
+            background: linear-gradient(135deg, #28a745, #20c997) !important;
+            color: white !important;
+            padding: 8px 12px !important;
+            border-radius: 5px !important;
+            font-weight: bold !important;
+        }
+        
+        .local-delivery {
+            border-left: 4px solid #28a745;
+            padding-left: 12px;
+            background: #f8fff9;
+            margin: 5px 0;
+        }
+        
+        .viettel-delivery {
+            border-left: 4px solid #007cba;
+            padding-left: 12px;
+            background: #f0f8ff;
+            margin: 5px 0;
+        }
+        
+        .economy-service {
+            position: relative;
+        }
+        
+        .economy-service:after {
+            content: "TIẾT KIỆM";
+            position: absolute;
+            top: -5px;
+            right: 5px;
+            background: #17a2b8;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        
+        .express-service {
+            position: relative;
+        }
+        
+        .express-service:after {
+            content: "NHANH";
+            position: absolute;
+            top: -5px;
+            right: 5px;
+            background: #dc3545;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        
+        .shipping-cost-breakdown {
+            margin-top: 5px;
+            padding-left: 20px;
+        }
+        
+        .woocommerce-shipping-fields {
+            display: none !important;
+        }
+        
+        #shipping_method li {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        #shipping_method li:hover {
+            border-color: #007cba;
+            background: #f9f9f9;
+        }
+        </style>
+        <?php
+    }
+}
+add_action('wp_head', 'phonestore_shipping_options_css');
+
+// Tính phí vận chuyển cơ bản dựa trên địa chỉ
+function phonestore_calculate_base_shipping_fee() {
+    if (is_admin() && !defined('DOING_AJAX')) return;
+    
+    if (!is_cart() && !is_checkout()) return;
+    
+    // Lấy thông tin địa chỉ
+    $billing_state = WC()->customer->get_billing_state();
+    $billing_city = WC()->customer->get_billing_city();
+    $billing_address = WC()->customer->get_billing_address_1();
+    
+    if (empty($billing_state) || empty($billing_city)) {
+        return; // Chưa có đủ thông tin địa chỉ
+    }
+    
+    // Tính phí vận chuyển cơ bản
+    $base_shipping_fee = phonestore_get_base_shipping_cost($billing_state, $billing_city, $billing_address);
+    
+    // Xóa phí cũ nếu có
+    $fees = WC()->cart->get_fees();
+    foreach ($fees as $fee_key => $fee) {
+        if ($fee->name === 'Phí vận chuyển') {
+            WC()->cart->fees_api()->remove_fee($fee_key);
+        }
+    }
+    
+    // Thêm phí vận chuyển cơ bản
+    if ($base_shipping_fee > 0) {
+        WC()->cart->add_fee('Phí vận chuyển', $base_shipping_fee);
+    }
+}
+add_action('woocommerce_cart_calculate_fees', 'phonestore_calculate_base_shipping_fee');
+
+// Function tính phí vận chuyển cơ bản
+function phonestore_get_base_shipping_cost($province, $city, $address) {
+    $province = strtolower(trim($province));
+    $city = strtolower(trim($city));
+    
+    // Chuẩn hóa tên tỉnh
+    $province = str_replace(array('tỉnh', 'thành phố', 'tp.', 'tp'), '', $province);
+    $province = trim($province);
+    
+    $can_tho_provinces = array('can tho', 'cần thơ', 'cantho');
+    
+    // Kiểm tra có phải Cần Thơ không
+    if (in_array($province, $can_tho_provinces)) {
+        // Tính khoảng cách trong Cần Thơ
+        $distance = phonestore_estimate_distance_in_can_tho($city, $address);
+        
+        if ($distance <= 10) {
+            return 0; // Miễn phí 0-10km
+        } elseif ($distance <= 20) {
+            return 15000; // 15k cho 10-20km
+        } elseif ($distance <= 30) {
+            return 25000; // 25k cho 20-30km
+        } else {
+            return 25000; // Fallback cho xa hơn
+        }
+    } else {
+        // Ngoài tỉnh - phí cơ bản Viettel Post
+        $south_region = array(
+            'an giang', 'bac lieu', 'bạc liêu', 'ben tre', 'bến tre', 'ca mau', 'cà mau',
+            'dong thap', 'đồng tháp', 'hau giang', 'hậu giang', 'kien giang', 'kiên giang',
+            'long an', 'soc trang', 'sóc trăng', 'tay ninh', 'tây ninh', 'tien giang', 'tiền giang',
+            'tra vinh', 'trà vinh', 'vinh long', 'vĩnh long', 'ho chi minh', 'hồ chí minh',
+            'tp ho chi minh', 'tp hồ chí minh', 'binh duong', 'bình dương', 'binh phuoc', 'bình phước',
+            'dong nai', 'đồng nai', 'ba ria vung tau', 'bà rịa vũng tàu'
+        );
+        
+        if (in_array($province, $south_region)) {
+            return 25000; // Cùng vùng miền
+        } else {
+            return 35000; // Khác vùng miền
+        }
+    }
+}
+
+// Estimate khoảng cách trong Cần Thơ
+function phonestore_estimate_distance_in_can_tho($city, $address) {
+    $city = strtolower(trim($city));
+    
+    // Mapping khoảng cách ước tính cho các quận/huyện Cần Thơ
+    $distance_map = array(
+        'ninh kieu' => 5,   // Trung tâm thành phố
+        'cai rang' => 8,    // Gần trung tâm
+        'binh thuy' => 12,  // Xa hơn một chút
+        'o mon' => 18,      // Khá xa
+        'thot not' => 25,   // Rất xa
+        'co do' => 22,
+        'phong dien' => 20,
+        'thoi lai' => 28,
+        'vinh thanh' => 30
+    );
+    
+    // Chuẩn hóa tên quận/huyện
+    $city_normalized = str_replace(array('quan', 'huyen', 'thi xa'), '', $city);
+    $city_normalized = trim($city_normalized);
+    
+    if (isset($distance_map[$city_normalized])) {
+        return $distance_map[$city_normalized];
+    }
+    
+    // Fallback - ước tính dựa trên từ khóa trong địa chỉ
+    if (strpos($address, 'trung tâm') !== false || strpos($address, 'center') !== false) {
+        return 5;
+    } elseif (strpos($address, 'ngoại ô') !== false || strpos($address, 'xa') !== false) {
+        return 20;
+    } else {
+        return 15; // Mặc định
+    }
+}
+
+
 ?>
