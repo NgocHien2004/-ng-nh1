@@ -5100,17 +5100,21 @@ add_action('wp_footer', 'phonestore_realtime_shipping_update');
 
 // Debug function - chỉ hiển thị cho admin
 // Debug function - đơn giản hóa
+// Debug function cho 2 phần
 function phonestore_debug_shipping_calculation() {
     if (is_checkout() && current_user_can('administrator')) {
-        $shipping_info = WC()->session->get('current_shipping_info');
+        $address_info = WC()->session->get('customer_address_info');
+        $shipping_fee = WC()->session->get('calculated_shipping_fee');
+        $shipping_desc = WC()->session->get('calculated_shipping_description');
         $selected_type = WC()->session->get('selected_shipping_type');
-        $temp_address = WC()->session->get('temp_billing_address');
         
         echo '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px 0; font-size: 12px;">';
-        echo '<strong>🔧 DEBUG SHIPPING:</strong><br>';
+        echo '<strong>🔧 DEBUG - PHẦN 1 (Địa chỉ):</strong><br>';
+        echo 'Address Info: ' . print_r($address_info, true) . '<br>';
+        echo '<strong>🔧 DEBUG - PHẦN 2 (Shipping):</strong><br>';
         echo 'Selected Type: ' . ($selected_type ?: 'economy') . '<br>';
-        echo 'Temp Address: ' . print_r($temp_address, true) . '<br>';
-        echo 'Shipping Info: ' . print_r($shipping_info, true);
+        echo 'Calculated Fee: ' . ($shipping_fee ?: 'chưa tính') . '<br>';
+        echo 'Description: ' . ($shipping_desc ?: 'chưa có') . '<br>';
         echo '</div>';
     }
 }
@@ -5186,5 +5190,352 @@ function phonestore_save_billing_address_on_update($post_data) {
     }
 }
 add_action('woocommerce_checkout_update_order_review', 'phonestore_save_billing_address_on_update', 5);
+
+// ===== PHẦN 1: LƯU THÔNG TIN ĐỊA CHỈ =====
+
+// AJAX handler lưu địa chỉ
+function phonestore_save_address_info() {
+    check_ajax_referer('address-nonce', 'security');
+    
+    $province = sanitize_text_field($_POST['province']);
+    $district = sanitize_text_field($_POST['district']);
+    
+    // Lưu vào session
+    WC()->session->set('customer_address_info', array(
+        'province' => $province,
+        'district' => $district,
+        'timestamp' => time()
+    ));
+    
+    error_log("Address saved to session: {$province} - {$district}");
+    
+    wp_send_json_success(array(
+        'message' => 'Địa chỉ đã được lưu',
+        'province' => $province,
+        'district' => $district
+    ));
+}
+add_action('wp_ajax_save_address_info', 'phonestore_save_address_info');
+add_action('wp_ajax_nopriv_save_address_info', 'phonestore_save_address_info');
+
+// JavaScript cho PHẦN 1 - Chỉ lưu địa chỉ
+function phonestore_address_saver_script() {
+    if (is_checkout()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            var provinces_data = <?php echo json_encode(get_vietnam_provinces_districts()); ?>;
+            var saveTimer;
+            
+            console.log('=== ADDRESS SAVER LOADED ===');
+            
+            // Update districts dropdown
+            function updateDistricts() {
+                var selectedProvince = $('#billing_state').val();
+                var $districtSelect = $('#billing_city');
+                
+                $districtSelect.empty().append('<option value="">Chọn Quận/Huyện</option>');
+                
+                if (selectedProvince && provinces_data[selectedProvince]) {
+                    var districts = provinces_data[selectedProvince];
+                    $.each(districts, function(index, district) {
+                        $districtSelect.append('<option value="' + district + '">' + district + '</option>');
+                    });
+                }
+            }
+            
+            // Lưu địa chỉ với delay
+            function saveAddressInfo() {
+                var province = $('#billing_state').val();
+                var district = $('#billing_city').val();
+                
+                if (province && district && province !== '' && district !== '') {
+                    clearTimeout(saveTimer);
+                    saveTimer = setTimeout(function() {
+                        console.log('Saving address:', province, '-', district);
+                        
+                        $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
+                            action: 'save_address_info',
+                            province: province,
+                            district: district,
+                            security: '<?php echo wp_create_nonce('address-nonce'); ?>'
+                        }, function(response) {
+                            if (response.success) {
+                                console.log('Address saved successfully:', response.data);
+                                
+                                // Hiển thị notification nhỏ
+                                showAddressNotification(province, district);
+                                
+                                // Trigger tính shipping sau 1 giây
+                                setTimeout(function() {
+                                    triggerShippingCalculation();
+                                }, 1000);
+                            }
+                        }).fail(function() {
+                            console.log('Failed to save address');
+                        });
+                    }, 800);
+                }
+            }
+            
+            // Hiển thị thông báo đã lưu địa chỉ
+            function showAddressNotification(province, district) {
+                var notification = $('<div class="address-saved-notification">✅ Địa chỉ đã lưu: ' + district + ', ' + province + '</div>');
+                notification.css({
+                    'position': 'fixed',
+                    'top': '20px',
+                    'right': '20px',
+                    'background': '#28a745',
+                    'color': 'white',
+                    'padding': '10px 15px',
+                    'border-radius': '5px',
+                    'z-index': '9999',
+                    'font-size': '14px'
+                });
+                
+                $('body').append(notification);
+                
+                setTimeout(function() {
+                    notification.fadeOut(function() {
+                        notification.remove();
+                    });
+                }, 3000);
+            }
+            
+            // Trigger tính shipping
+            function triggerShippingCalculation() {
+                console.log('Triggering shipping calculation...');
+                $('#calculate-shipping-btn').trigger('click');
+            }
+            
+            // Event listeners
+            $(document).on('change', '#billing_state', function() {
+                console.log('Province changed:', $(this).val());
+                updateDistricts();
+                $('#billing_city').val(''); // Reset district
+            });
+            
+            $(document).on('change', '#billing_city', function() {
+                console.log('District changed:', $(this).val());
+                saveAddressInfo();
+            });
+            
+            // Initialize districts nếu đã có tỉnh được chọn
+            var currentProvince = $('#billing_state').val();
+            if (currentProvince) {
+                updateDistricts();
+            }
+        });
+        </script>
+        <?php
+    }
+}
+add_action('wp_footer', 'phonestore_address_saver_script', 5);
+
+// ===== PHẦN 2: TÍNH SHIPPING TỪ SESSION =====
+
+// Tắt hoàn toàn automatic calculation
+remove_action('woocommerce_cart_calculate_fees', 'phonestore_calculate_shipping_automatically');
+
+// Button tính shipping thủ công
+function phonestore_manual_shipping_calculator() {
+    if (is_checkout()) {
+        ?>
+        <div id="manual-shipping-section" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 2px solid #007cba;">
+            <h4 style="margin: 0 0 15px 0;">🧮 Tính phí vận chuyển</h4>
+            
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button type="button" id="calculate-shipping-btn" class="button" style="background: #007cba; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
+                    Tính phí giao hàng
+                </button>
+                
+                <button type="button" id="reset-shipping-btn" class="button" style="background: #dc3545; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;">
+                    🔄 Reset
+                </button>
+            </div>
+            
+            <div id="shipping-result" style="margin-top: 15px; padding: 10px; background: white; border-radius: 5px; display: none;">
+                <div id="shipping-details"></div>
+            </div>
+        </div>
+        
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            var isUpdating = false;
+            
+            $('#calculate-shipping-btn').on('click', function() {
+                if (isUpdating) {
+                    console.log('Already updating, skipping...');
+                    return;
+                }
+                
+                var $btn = $(this);
+                var originalText = $btn.text();
+                
+                isUpdating = true;
+                $btn.text('⏳ Đang tính...').prop('disabled', true);
+                
+                $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
+                    action: 'calculate_manual_shipping',
+                    security: '<?php echo wp_create_nonce('manual-shipping-nonce'); ?>'
+                }, function(response) {
+                    if (response.success) {
+                        $('#shipping-details').html(response.data.html);
+                        $('#shipping-result').show();
+                        
+                        console.log('✅ Shipping calculated:', response.data.fee);
+                        
+                        // Chỉ update một lần
+                        $('body').trigger('update_checkout');
+                        
+                        $btn.text('✅ Đã tính xong').css('background', '#28a745');
+                        
+                        setTimeout(function() {
+                            $btn.text('🔄 Tính lại').css('background', '#007cba').prop('disabled', false);
+                            isUpdating = false;
+                        }, 2000);
+                        
+                    } else {
+                        $btn.text(originalText).prop('disabled', false);
+                        isUpdating = false;
+                        alert('Lỗi: ' + response.data.message);
+                    }
+                }).fail(function() {
+                    $btn.text(originalText).prop('disabled', false);
+                    isUpdating = false;
+                    alert('Không thể kết nối server');
+                });
+            });
+            
+            // Reset button
+            $('#reset-shipping-btn').on('click', function() {
+                $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
+                    action: 'reset_shipping',
+                    security: '<?php echo wp_create_nonce('reset-shipping-nonce'); ?>'
+                }, function() {
+                    $('#shipping-result').hide();
+                    $('#calculate-shipping-btn').text('Tính phí giao hàng').css('background', '#007cba').prop('disabled', false);
+                    isUpdating = false;
+                    $('body').trigger('update_checkout');
+                    console.log('🔄 Reset completed');
+                });
+            });
+        });
+        </script>
+        <?php
+    }
+    
+}
+add_action('woocommerce_checkout_before_order_review', 'phonestore_manual_shipping_calculator');
+
+// AJAX handler tính shipping và force update ngay
+function phonestore_calculate_manual_shipping() {
+    check_ajax_referer('manual-shipping-nonce', 'security');
+    
+    // Lấy địa chỉ từ session
+    $address_info = WC()->session->get('customer_address_info');
+    
+    if (!$address_info || empty($address_info['province']) || empty($address_info['district'])) {
+        wp_send_json_error(array(
+            'message' => 'Vui lòng chọn đầy đủ Tỉnh/Thành phố và Quận/Huyện trước'
+        ));
+    }
+    
+    $province = $address_info['province'];
+    $district = $address_info['district'];
+    
+    // Lấy shipping type
+    $shipping_type = WC()->session->get('selected_shipping_type', 'economy');
+    
+    // Tính phí
+    $shipping_fee = phonestore_get_shipping_fee_by_location($province, $district, $shipping_type);
+    $description = phonestore_get_shipping_description($province, $district, $shipping_type);
+    
+    // LƯU VÀO SESSION NGAY LẬP TỨC
+    WC()->session->set('calculated_shipping_fee', $shipping_fee);
+    WC()->session->set('calculated_shipping_description', $description);
+    WC()->session->set('shipping_calculation_done', true); // Flag để biết đã tính xong
+    
+    // FORCE CẬP NHẬT CART NGAY
+    WC()->cart->calculate_fees();
+    WC()->cart->calculate_totals();
+    
+    // Tạo HTML hiển thị kết quả
+    $html = '<div style="border: 1px solid #28a745; padding: 12px; border-radius: 5px; background: #f8fff8;">';
+    $html .= '<div style="color: #28a745; font-weight: bold; margin-bottom: 8px;">✅ Đã tính xong phí vận chuyển</div>';
+    $html .= '<div><strong>📍 Địa chỉ:</strong> ' . esc_html($district . ', ' . $province) . '</div>';
+    $html .= '<div><strong>🚚 Loại giao hàng:</strong> ' . ($shipping_type === 'economy' ? 'Tiết kiệm (3-5 ngày)' : 'Nhanh (1-2 ngày)') . '</div>';
+    $html .= '<div><strong>💰 Phí vận chuyển:</strong> <span style="color: #e74c3c; font-weight: bold;">' . number_format($shipping_fee) . ' ₫</span></div>';
+    $html .= '<div><strong>📝 Mô tả:</strong> ' . esc_html($description) . '</div>';
+    $html .= '</div>';
+    
+    error_log("Manual shipping calculated and saved: Fee={$shipping_fee}");
+    
+    wp_send_json_success(array(
+        'fee' => $shipping_fee,
+        'description' => $description,
+        'html' => $html,
+        'force_update' => true // Signal để force update checkout
+    ));
+}
+add_action('wp_ajax_calculate_manual_shipping', 'phonestore_calculate_manual_shipping');
+add_action('wp_ajax_nopriv_calculate_manual_shipping', 'phonestore_calculate_manual_shipping');
+
+// Add fee đơn giản - không phức tạp
+function phonestore_add_calculated_shipping_fee() {
+    if (is_admin() && !defined('DOING_AJAX')) return;
+    if (!is_cart() && !is_checkout()) return;
+    
+    static $fee_added = false; // Tránh add nhiều lần
+    
+    $shipping_fee = WC()->session->get('calculated_shipping_fee');
+    $calculation_done = WC()->session->get('shipping_calculation_done');
+    
+    if ($calculation_done && $shipping_fee !== null && !$fee_added) {
+        // Xóa fees cũ
+        $current_fees = WC()->cart->get_fees();
+        foreach ($current_fees as $fee_key => $fee) {
+            if ($fee->name === 'Phí vận chuyển') {
+                WC()->cart->remove_fee($fee_key);
+            }
+        }
+        
+        // Thêm fee mới
+        if ($shipping_fee > 0) {
+            WC()->cart->add_fee('Phí vận chuyển', $shipping_fee);
+            $fee_added = true;
+            error_log("Added shipping fee: {$shipping_fee}");
+        }
+    }
+}
+add_action('woocommerce_cart_calculate_fees', 'phonestore_add_calculated_shipping_fee');
+
+// Reset tính toán shipping
+function phonestore_reset_shipping_calculation() {
+    WC()->session->set('shipping_calculation_done', false);
+    WC()->session->set('calculated_shipping_fee', null);
+    WC()->session->set('calculated_shipping_description', null);
+    
+    // Xóa fees
+    foreach (WC()->cart->get_fees() as $fee_key => $fee) {
+        if ($fee->name === 'Phí vận chuyển') {
+            WC()->cart->remove_fee($fee_key);
+        }
+    }
+    
+    WC()->cart->calculate_totals();
+}
+
+// AJAX handler reset
+function phonestore_reset_shipping() {
+    check_ajax_referer('reset-shipping-nonce', 'security');
+    
+    phonestore_reset_shipping_calculation();
+    
+    wp_send_json_success(array('message' => 'Đã reset tính toán'));
+}
+add_action('wp_ajax_reset_shipping', 'phonestore_reset_shipping');
+add_action('wp_ajax_nopriv_reset_shipping', 'phonestore_reset_shipping');
+
 
 ?>
