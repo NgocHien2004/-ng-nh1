@@ -157,6 +157,40 @@ defined( 'ABSPATH' ) || exit;
    	</div>
    </div>
 
+
+<!-- Checkout Buttons -->
+<?php if (is_user_logged_in()): ?>
+<div class="checkout-buttons-section">
+    <h4>🚀 Tiếp tục thanh toán</h4>
+    <div class="checkout-buttons-wrapper">
+        <form class="checkout-form-with-invoice" method="post">
+            <?php wp_nonce_field('proceed_to_checkout', 'checkout_nonce'); ?>
+            <input type="hidden" name="proceed_to_checkout" value="1">
+            
+            <button type="submit" name="proceed_to_checkout" class="checkout-btn invoice-btn">
+                <div class="btn-icon">📧</div>
+                <div class="btn-content">
+                    <div class="btn-title">Gửi hóa đơn</div>
+                    <div class="btn-subtitle">Xem trước qua email</div>
+                </div>
+            </button>
+        </form>
+        
+        <a href="<?php echo wc_get_checkout_url(); ?>" class="checkout-btn direct-btn">
+            <div class="btn-icon">🚀</div>
+            <div class="btn-content">
+                <div class="btn-title">Thanh toán ngay</div>
+                <div class="btn-subtitle">Đi tới trang checkout</div>
+            </div>
+        </a>
+    </div>
+    
+    <div class="checkout-notice">
+        💡 Bạn có thể gửi hóa đơn qua email để xem trước hoặc thanh toán trực tiếp
+    </div>
+</div>
+<?php endif; ?>
+
    <!-- Invoice Preview -->
    <?php if (WC()->session->get('pending_invoice')): 
    	$pending_invoice = WC()->session->get('pending_invoice');
@@ -168,14 +202,6 @@ defined( 'ABSPATH' ) || exit;
    			<p><strong>Số hóa đơn:</strong> <?php echo esc_html($pending_invoice['invoice_number']); ?></p>
    			<p><strong>Gửi đến:</strong> <?php echo esc_html($pending_invoice['customer_email']); ?></p>
    			<p><strong>Thời gian:</strong> <?php echo date('d/m/Y H:i', strtotime($pending_invoice['sent_time'])); ?></p>
-   		</div>
-   		<div class="invoice-actions">
-   			<a href="<?php echo wc_get_checkout_url(); ?>" class="button checkout-button-final">
-   				🚀 Tiếp tục thanh toán
-   			</a>
-   			<button class="button resend-invoice" data-invoice="<?php echo esc_attr($pending_invoice['invoice_number']); ?>">
-   				📧 Gửi lại hóa đơn
-   			</button>
    		</div>
    	</div>
    </div>
@@ -612,6 +638,346 @@ defined( 'ABSPATH' ) || exit;
        text-align: center;
    }
 }
+
+/* Checkout Buttons Section */
+.checkout-buttons-section {
+    margin: 30px 0;
+    padding: 25px;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 15px;
+    border: 2px solid #cbd5e1;
+    text-align: center;
+}
+
+.checkout-buttons-section h4 {
+    color: #1a202c;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.checkout-buttons-wrapper {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    align-items: stretch;
+    margin-bottom: 15px;
+}
+
+.checkout-form-with-invoice {
+    flex: 1;
+    max-width: 250px;
+}
+
+.checkout-btn {
+    width: 100%;
+    min-height: 80px;
+    padding: 15px 20px;
+    border: none;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.checkout-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.checkout-btn:active {
+    transform: translateY(0);
+}
+
+.invoice-btn {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white !important;
+}
+
+.invoice-btn:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.direct-btn {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white !important;
+    max-width: 250px;
+}
+
+.direct-btn:hover {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+}
+
+.btn-icon {
+    font-size: 24px;
+    min-width: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+}
+
+.btn-title {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 2px;
+}
+
+.btn-subtitle {
+    font-size: 12px;
+    opacity: 0.9;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.checkout-notice {
+    color: #64748b;
+    font-size: 14px;
+    font-style: italic;
+    margin-top: 15px;
+}
+
+/* Loading States */
+.checkout-form-with-invoice.loading .invoice-btn {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.checkout-form-with-invoice.loading .btn-title::after {
+    content: " ⏳";
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .checkout-buttons-wrapper {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .checkout-form-with-invoice,
+    .direct-btn {
+        max-width: 100%;
+    }
+    
+    .checkout-btn {
+        min-height: 70px;
+        padding: 12px 15px;
+        gap: 12px;
+    }
+    
+    .btn-icon {
+        font-size: 20px;
+        min-width: 25px;
+    }
+    
+    .btn-title {
+        font-size: 14px;
+    }
+    
+    .btn-subtitle {
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+    .checkout-buttons-section {
+        padding: 20px 15px;
+        margin: 20px 0;
+    }
+    
+    .checkout-buttons-section h4 {
+        font-size: 16px;
+    }
+    
+    .checkout-btn {
+        min-height: 65px;
+        padding: 10px 12px;
+    }
+}
+
+/* Checkout Buttons Section */
+.checkout-buttons-section {
+    margin: 30px 0;
+    padding: 25px;
+    background: #f8fafc;
+    border-radius: 15px;
+    border: 2px solid #e2e8f0;
+    text-align: center;
+}
+
+.checkout-buttons-section h4 {
+    color: #1a202c;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.checkout-buttons-wrapper {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    align-items: stretch;
+    margin-bottom: 15px;
+}
+
+.checkout-form-with-invoice {
+    flex: 1;
+    max-width: 300px;
+}
+
+.checkout-btn {
+    width: 100%;
+    height: 80px;
+    padding: 15px;
+    border: none;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 15px;
+    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.checkout-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.invoice-btn {
+    background: #10b981;
+    color: white !important;
+}
+
+.invoice-btn:hover {
+    background: #059669;
+}
+
+.direct-btn {
+    background: #f59e0b;
+    color: white !important;
+    max-width: 300px;
+}
+
+.direct-btn:hover {
+    background: #d97706;
+}
+
+.btn-icon {
+    font-size: 24px;
+    min-width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.2);
+    border-radius: 8px;
+}
+
+.btn-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+}
+
+.btn-title {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 2px;
+}
+
+.btn-subtitle {
+    font-size: 12px;
+    opacity: 0.9;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.checkout-notice {
+    color: #64748b;
+    font-size: 14px;
+    font-style: italic;
+    margin-top: 15px;
+}
+
+/* Loading States */
+.checkout-form-with-invoice.loading .invoice-btn {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.checkout-form-with-invoice.loading .btn-title::after {
+    content: " ⏳";
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .checkout-buttons-wrapper {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .checkout-form-with-invoice,
+    .direct-btn {
+        max-width: 100%;
+    }
+    
+    .checkout-btn {
+        height: 70px;
+        padding: 12px;
+        gap: 12px;
+    }
+    
+    .btn-icon {
+        font-size: 20px;
+        min-width: 35px;
+        height: 35px;
+    }
+    
+    .btn-title {
+        font-size: 14px;
+    }
+    
+    .btn-subtitle {
+        font-size: 11px;
+    }
+}
+
+
 </style>
 
 <script>
