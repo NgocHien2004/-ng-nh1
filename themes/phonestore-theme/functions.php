@@ -2967,12 +2967,12 @@ function phonestore_add_shipping_methods($methods) {
     $methods['distance_based_shipping'] = 'Distance_Based_Shipping';
     return $methods;
 }
-
 add_action('woocommerce_shipping_init', 'phonestore_register_shipping_methods');
 add_filter('woocommerce_shipping_methods', 'phonestore_add_shipping_methods');
 
-add_action('woocommerce_shipping_init', 'phonestore_register_shipping_methods');
-add_filter('woocommerce_shipping_methods', 'phonestore_add_shipping_methods');
+add_action('woocommerce_shipping_init', 'phonestore_register_vietnam_shipping');
+add_filter('woocommerce_shipping_methods', 'phonestore_add_vietnam_shipping');
+
 
 // Kiểm tra API key OpenRouteService
 function phonestore_check_api_configuration() {
