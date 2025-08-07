@@ -288,28 +288,56 @@ function phonestore_get_product_compare() {
     }
     
     $product_id = intval($_POST['product_id']);
-    $product = get_post($product_id);
+    $wc_product = wc_get_product($product_id);
     
-    if (!$product || $product->post_type !== 'product') {
+    if (!$wc_product) {
         wp_send_json_error('Product not found');
         return;
     }
     
-    $wc_product = wc_get_product($product_id);
+    // COPY CHÍNH XÁC LOGIC TỪ SINGLE-PRODUCT.PHP
+    $all_specs = array();
+    
+    // Lấy WooCommerce attributes
+    $wc_attributes = $wc_product->get_attributes();
+    foreach ($wc_attributes as $attribute) {
+        $attribute_name = $attribute->get_name();
+        $clean_name = str_replace('pa_', '', $attribute_name);
+        
+        if ($attribute->is_taxonomy()) {
+            $values = wc_get_product_terms($product_id, $attribute->get_name(), array('fields' => 'names'));
+            $value = implode(', ', $values);
+        } else {
+            $value = $attribute->get_options();
+            if (is_array($value)) {
+                $value = implode(', ', $value);
+            }
+        }
+        if (!empty($value)) {
+            $all_specs[$clean_name] = $value;
+        }
+    }
+    
+    // Lấy custom meta fields - CHÍNH XÁC NHƯ SINGLE-PRODUCT.PHP
+    $meta_keys = get_post_meta($product_id);
+    foreach ($meta_keys as $key => $values) {
+        if (strpos($key, '_') !== 0 && !empty($values[0])) {
+            $all_specs[$key] = $values[0];
+        }
+    }
     
     $product_data = array(
         'id' => $product_id,
-        'title' => $product->post_title,
+        'title' => get_the_title($product_id),
+        'attributes' => $all_specs,
         'price' => $wc_product ? $wc_product->get_price_html() : 'Liên hệ',
         'image' => get_the_post_thumbnail_url($product_id, 'medium') ?: wc_placeholder_img_src()
     );
     
     wp_send_json_success($product_data);
 }
-add_action('wp_ajax_phonestore_get_product_compare', 'phonestore_get_product_compare');
-add_action('wp_ajax_nopriv_phonestore_get_product_compare', 'phonestore_get_product_compare');
 
-// AJAX handler - Load compare table
+// AJAX handler - Load compare table với đầy đủ attributes
 function phonestore_load_compare_table() {
     if (!wp_verify_nonce($_POST['nonce'], 'phonestore_nonce')) {
         wp_die('Security check failed');
@@ -323,7 +351,8 @@ function phonestore_load_compare_table() {
     }
     
     $products = array();
-    $specs = array();
+    $all_specs = array();
+    $all_spec_keys = array(); // Để lưu tất cả các spec keys có thể có
     
     // Get products data
     foreach ($product_ids as $product_id) {
@@ -340,32 +369,110 @@ function phonestore_load_compare_table() {
             'url' => get_permalink($product_id)
         );
         
-        // Get specs (using ACF or custom fields)
+        // Get product attributes from WooCommerce
         $product_specs = array();
         
-        if (function_exists('get_field')) {
-            $product_specs['brand'] = get_field('brand', $product_id) ?: 'Không có thông tin';
-            $product_specs['display_size'] = get_field('display_size', $product_id) ?: 'Không có thông tin';
-            $product_specs['cpu'] = get_field('cpu', $product_id) ?: 'Không có thông tin';
-            $product_specs['ram'] = get_field('ram', $product_id) ?: 'Không có thông tin';
-            $product_specs['storage'] = get_field('storage', $product_id) ?: 'Không có thông tin';
-            $product_specs['rear_camera'] = get_field('rear_camera', $product_id) ?: 'Không có thông tin';
-            $product_specs['battery'] = get_field('battery', $product_id) ?: 'Không có thông tin';
-            $product_specs['os'] = get_field('os', $product_id) ?: 'Không có thông tin';
-        } else {
-            // Fallback to post meta
-            $product_specs['brand'] = get_post_meta($product_id, 'brand', true) ?: 'Không có thông tin';
-            $product_specs['display_size'] = get_post_meta($product_id, 'display_size', true) ?: 'Không có thông tin';
-            $product_specs['cpu'] = get_post_meta($product_id, 'cpu', true) ?: 'Không có thông tin';
-            $product_specs['ram'] = get_post_meta($product_id, 'ram', true) ?: 'Không có thông tin';
-            $product_specs['storage'] = get_post_meta($product_id, 'storage', true) ?: 'Không có thông tin';
-            $product_specs['rear_camera'] = get_post_meta($product_id, 'rear_camera', true) ?: 'Không có thông tin';
-            $product_specs['battery'] = get_post_meta($product_id, 'battery', true) ?: 'Không có thông tin';
-            $product_specs['os'] = get_post_meta($product_id, 'os', true) ?: 'Không có thông tin';
+        if ($wc_product) {
+            $attributes = $wc_product->get_attributes();
+            
+            foreach ($attributes as $attribute) {
+                $attribute_name = $attribute->get_name();
+                $attribute_key = str_replace('pa_', '', $attribute_name);
+                $attribute_label = wc_attribute_label($attribute_name);
+                
+                if ($attribute->is_taxonomy()) {
+                    $values = wc_get_product_terms($product_id, $attribute_name, array('fields' => 'names'));
+                    $value = implode(', ', $values);
+                } else {
+                    $value = implode(', ', $attribute->get_options());
+                }
+                
+                if (!empty($value)) {
+                    $product_specs[$attribute_key] = $value;
+                    $all_spec_keys[$attribute_key] = $attribute_label; // Lưu label cho spec này
+                }
+            }
         }
         
-        $specs[$product_id] = $product_specs;
+        // Fallback: Lấy từ post meta với mapping đầy đủ
+        $meta_mapping = array(
+            'thuong-hieu-brand' => 'Thương hiệu',
+            'man-hinh-display' => 'Màn hình',
+            'camera' => 'Camera chính',
+            'camera-truoc' => 'Camera trước',
+            'ram' => 'RAM',
+            'bo-nho-storage' => 'Bộ nhớ trong',
+            'pin' => 'Pin',
+            'he-dieu-hanh' => 'Hệ điều hành',
+            'chip-xu-ly-cpu' => 'CPU',
+            'chip-do-hoa-gpu' => 'GPU', 
+            'bluetooth' => 'Bluetooth',
+            'wifi' => 'Wi-Fi',
+            'chat-lieu' => 'Chất liệu',
+            'cong-ket-noi-sac' => 'Cổng sạc',
+            'nghe-nhac' => 'Nghe nhạc',
+            'xem-phim' => 'Xem phim',
+            'choi-game' => 'Chơi game',
+            'khoang-gia' => 'Khoảng giá',
+            'vi-xu-ly' => 'Vi xử lý',
+            'quay-phim-camera-sau' => 'Quay phim camera sau',
+            'thiet-ke' => 'Thiết kế',
+            'thoi-diem-ra-mat' => 'Thời điểm ra mắt',
+            'tinh-nang-camera-sau' => 'Tính năng camera sau',
+            'tinh-nang-camera-truoc' => 'Tính năng camera trước',
+            'tinh-nang-dac-biet' => 'Tính năng đặc biệt',
+            'toc-do-cpu' => 'Tốc độ CPU',
+            'kich-thuoc' => 'Kích thước',
+            'trong-luong' => 'Trọng lượng',
+            'mau-sac' => 'Màu sắc',
+            'sim' => 'SIM',
+            'mang' => 'Mạng',
+            'gps' => 'GPS',
+            'cam-bien' => 'Cảm biến',
+            'jack-tai-nghe' => 'Jack tai nghe',
+            'loa' => 'Loa',
+            'chong-nuoc' => 'Chống nước',
+            'bao-mat' => 'Bảo mật'
+        );
+        
+        $all_meta = get_post_meta($product_id);
+        foreach ($meta_mapping as $meta_key => $label) {
+            if (isset($all_meta[$meta_key]) && !empty($all_meta[$meta_key][0])) {
+                $product_specs[$meta_key] = $all_meta[$meta_key][0];
+                $all_spec_keys[$meta_key] = $label;
+            }
+        }
+        
+        // Nếu vẫn không có thông số, thử lấy tất cả meta fields không bắt đầu với _
+        if (empty($product_specs)) {
+            foreach ($all_meta as $key => $values) {
+                if (strpos($key, '_') !== 0 && !empty($values[0])) {
+                    $clean_key = str_replace('-', '_', $key);
+                    $label = ucwords(str_replace(array('-', '_'), ' ', $key));
+                    $product_specs[$clean_key] = $values[0];
+                    $all_spec_keys[$clean_key] = $label;
+                }
+            }
+        }
+        
+        $all_specs[$product_id] = $product_specs;
     }
+    
+    // Sắp xếp specs theo thứ tự ưu tiên
+    $priority_specs = array(
+        'thuong-hieu-brand' => 'Thương hiệu',
+        'man-hinh-display' => 'Màn hình', 
+        'chip-xu-ly-cpu' => 'CPU',
+        'ram' => 'RAM',
+        'bo-nho-storage' => 'Bộ nhớ trong',
+        'camera' => 'Camera chính',
+        'camera-truoc' => 'Camera trước',
+        'pin' => 'Pin',
+        'he-dieu-hanh' => 'Hệ điều hành'
+    );
+    
+    // Merge priority specs với các specs khác
+    $ordered_specs = array_merge($priority_specs, array_diff($all_spec_keys, $priority_specs));
     
     // Build compare table HTML
     $html = '<thead><tr><th class="spec-label">Thông số</th>';
@@ -373,46 +480,101 @@ function phonestore_load_compare_table() {
     foreach ($products as $product) {
         $html .= '<th class="product-column">';
         $html .= '<div class="product-header">';
-        $html .= '<img src="' . $product['image'] . '" alt="' . esc_attr($product['title']) . '">';
-        $html .= '<h4><a href="' . $product['url'] . '">' . esc_html($product['title']) . '</a></h4>';
-        $html .= '<div class="price">' . $product['price'] . '</div>';
-        $html .= '<button class="remove-from-compare" data-product-id="' . $product['id'] . '">Xóa</button>';
+        $html .= '<img src="' . esc_url($product['image']) . '" alt="' . esc_attr($product['title']) . '" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">';
+        $html .= '<h4 style="margin: 10px 0 5px 0; font-size: 14px;"><a href="' . esc_url($product['url']) . '">' . esc_html($product['title']) . '</a></h4>';
+        $html .= '<div class="price" style="font-weight: bold; color: #e74c3c;">' . $product['price'] . '</div>';
+        $html .= '<button class="remove-from-compare" data-product-id="' . $product['id'] . '" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-top: 5px; cursor: pointer;">✕ Xóa</button>';
         $html .= '</div>';
         $html .= '</th>';
     }
-    
     $html .= '</tr></thead><tbody>';
     
-    // Spec rows
-    $spec_labels = array(
-        'brand' => '📱 Thương hiệu',
-        'display_size' => '📺 Màn hình',
-        'cpu' => '⚡ Vi xử lý',
-        'ram' => '💾 RAM',
-        'storage' => '💿 Bộ nhớ',
-        'rear_camera' => '📷 Camera',
-        'battery' => '🔋 Pin',
-        'os' => '🖥️ Hệ điều hành'
-    );
-    
-    foreach ($spec_labels as $spec_key => $spec_label) {
-        $html .= '<tr class="spec-row">';
-        $html .= '<td class="spec-label">' . $spec_label . '</td>';
-        
+    // Add specs rows
+    foreach ($ordered_specs as $spec_key => $spec_label) {
+        // Chỉ hiển thị spec nếu ít nhất 1 sản phẩm có thông tin này
+        $has_data = false;
         foreach ($products as $product_id => $product) {
-            $value = $specs[$product_id][$spec_key] ?? 'Không có thông tin';
-            $html .= '<td class="spec-value">' . esc_html($value) . '</td>';
+            if (isset($all_specs[$product_id][$spec_key]) && !empty($all_specs[$product_id][$spec_key])) {
+                $has_data = true;
+                break;
+            }
         }
         
-        $html .= '</tr>';
+        if ($has_data) {
+            $html .= '<tr>';
+            $html .= '<td class="spec-label" style="background: #f8f9fa; font-weight: bold; padding: 12px;">' . esc_html($spec_label) . '</td>';
+            
+            foreach ($products as $product_id => $product) {
+                $value = isset($all_specs[$product_id][$spec_key]) && !empty($all_specs[$product_id][$spec_key]) 
+                    ? $all_specs[$product_id][$spec_key] 
+                    : '<span style="color: #6c757d; font-style: italic;">Không có thông tin</span>';
+                $html .= '<td class="spec-value" style="padding: 12px; vertical-align: top;">' . $value . '</td>';
+            }
+            
+            $html .= '</tr>';
+        }
     }
     
     $html .= '</tbody>';
     
     wp_send_json_success($html);
 }
+
+// Đảm bảo action được đăng ký
 add_action('wp_ajax_phonestore_load_compare_table', 'phonestore_load_compare_table');
 add_action('wp_ajax_nopriv_phonestore_load_compare_table', 'phonestore_load_compare_table');
+
+// Hàm helper để debug attributes của sản phẩm
+function phonestore_debug_product_attributes_detailed($product_id) {
+    if (!current_user_can('administrator')) return;
+    
+    $product = wc_get_product($product_id);
+    if (!$product) return;
+    
+    echo '<div style="background: #f1f1f1; padding: 20px; margin: 20px 0; border: 1px solid #ddd;">';
+    echo '<h3>Debug Attributes for Product ID: ' . $product_id . '</h3>';
+    
+    // WooCommerce Attributes
+    echo '<h4>WooCommerce Attributes:</h4>';
+    $wc_attributes = $product->get_attributes();
+    if (!empty($wc_attributes)) {
+        foreach ($wc_attributes as $attribute) {
+            $name = $attribute->get_name();
+            $label = wc_attribute_label($name);
+            echo '<strong>' . $label . ' (' . $name . ')</strong>: ';
+            
+            if ($attribute->is_taxonomy()) {
+                $values = wc_get_product_terms($product_id, $name, array('fields' => 'names'));
+                echo implode(', ', $values);
+            } else {
+                echo implode(', ', $attribute->get_options());
+            }
+            echo '<br>';
+        }
+    } else {
+        echo 'Không có WooCommerce attributes<br>';
+    }
+    
+    // Post Meta
+    echo '<h4>Post Meta Fields:</h4>';
+    $all_meta = get_post_meta($product_id);
+    foreach ($all_meta as $key => $values) {
+        if (strpos($key, '_') !== 0) { // Chỉ hiển thị meta không bắt đầu với _
+            echo '<strong>' . $key . '</strong>: ' . (is_array($values) ? implode(', ', $values) : $values) . '<br>';
+        }
+    }
+    
+    echo '</div>';
+}
+
+// Thêm vào footer của single product để admin có thể debug
+function phonestore_admin_debug_footer() {
+    if (is_product() && current_user_can('administrator') && isset($_GET['debug_attrs'])) {
+        global $post;
+        phonestore_debug_product_attributes_detailed($post->ID);
+    }
+}
+add_action('wp_footer', 'phonestore_admin_debug_footer');
 
 // Contact form handler
 function phonestore_contact_form() {

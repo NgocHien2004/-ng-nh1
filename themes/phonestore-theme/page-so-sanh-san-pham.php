@@ -845,39 +845,41 @@ jQuery(document).ready(function($) {
            }, 800);
        }
    });
-   
+}
    // Update compare table
    function updateCompareTable() {
-       if (selectedProducts.length < 2) {
-           $('#compare-table-section').hide();
-           return;
-       }
-       
-       // Show loading
-       $('#compare-table').html('<tbody><tr><td colspan="100%" style="text-align: center; padding: 40px;">⏳ Đang tải dữ liệu so sánh...</td></tr></tbody>');
-       
-       // Load compare data via AJAX
-       $.ajax({
-           url: phonestore_ajax.ajax_url,
-           type: 'POST',
-           data: {
-               action: 'phonestore_load_compare_table',
-               product_ids: selectedProducts,
-               nonce: phonestore_ajax.nonce
-           },
-           success: function(response) {
-               if (response.success) {
-                   $('#compare-table').html(response.data);
-                   $('#compare-table-section').show();
-               } else {
-                   $('#compare-table').html('<tbody><tr><td colspan="100%" style="text-align: center; padding: 40px;">❌ Không thể tải dữ liệu so sánh. Vui lòng thử lại.</td></tr></tbody>');
-               }
-           },
-           error: function() {
-               $('#compare-table').html('<tbody><tr><td colspan="100%" style="text-align: center; padding: 40px;">❌ Lỗi kết nối. Vui lòng thử lại.</td></tr></tbody>');
-           }
-       });
-   }
+    if (selectedProducts.length < 2) {
+        $('#compare-table-section').hide();
+        return;
+    }
+    
+    // Show loading
+    $('#compare-table').html('<tbody><tr><td colspan="100%" style="text-align: center; padding: 40px;">⏳ Đang tải dữ liệu so sánh...</td></tr></tbody>');
+    
+    // Load compare data via AJAX
+    $.ajax({
+        url: phonestore_ajax.ajax_url,
+        type: 'POST',
+        data: {
+            action: 'phonestore_load_compare_table',
+            product_ids: selectedProducts,
+            nonce: phonestore_ajax.nonce
+        },
+        success: function(response) {
+            console.log('AJAX Response:', response); // Debug log
+            if (response.success) {
+                $('#compare-table').html(response.data);
+                $('#compare-table-section').show();
+            } else {
+                $('#compare-table').html('<tbody><tr><td colspan="100%" style="text-align: center; padding: 40px;">❌ Không thể tải dữ liệu so sánh. ' + (response.data || '') + '</td></tr></tbody>');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('AJAX Error:', xhr, status, error); // Debug log
+            $('#compare-table').html('<tbody><tr><td colspan="100%" style="text-align: center; padding: 40px;">❌ Lỗi kết nối: ' + error + '</td></tr></tbody>');
+        }
+    });
+}
    
    // Remove from compare table
    $(document).on('click', '.remove-from-compare', function() {
