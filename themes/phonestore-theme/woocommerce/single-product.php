@@ -455,27 +455,39 @@ get_header(); ?>
                 </div>
             </div>
             
-            <!-- Related Products -->
+              <div class="related-products-section">
             <div class="related-products">
                 <h3>📱 Sản phẩm liên quan</h3>
-                <div class="related-grid">
-                    <?php
-                    $related_products = wc_get_products(array(
-                        'limit' => 4,
-                        'exclude' => array($product_id),
-                        'orderby' => 'rand'
-                    ));
-                    
-                    foreach ($related_products as $related_product):
-                    ?>
-                        <div class="related-item">
-                            <a href="<?php echo get_permalink($related_product->get_id()); ?>">
-                                <?php echo $related_product->get_image('medium'); ?>
-                                <h4><?php echo $related_product->get_name(); ?></h4>
-                                <div class="price"><?php echo $related_product->get_price_html(); ?></div>
-                            </a>
-                        </div>
-                    <?php endforeach; ?>
+                <div class="related-slider-container">
+                    <button class="related-nav related-prev" id="related-prev">❮</button>
+                    <div class="related-slider" id="related-slider">
+                        <?php
+                        $related_products = wc_get_products(array(
+                            'limit' => 8,
+                            'exclude' => array($product_id),
+                            'orderby' => 'rand'
+                        ));
+                        
+                        foreach ($related_products as $related_product):
+                        ?>
+                            <div class="related-item">
+                                <a href="<?php echo get_permalink($related_product->get_id()); ?>">
+                                    <div class="related-image">
+                                        <?php echo $related_product->get_image('medium'); ?>
+                                    </div>
+                                    <div class="related-info">
+                                        <h4><?php echo $related_product->get_name(); ?></h4>
+                                        <div class="related-price"><?php echo $related_product->get_price_html(); ?></div>
+                                        <div class="related-rating">
+                                            <div class="stars">⭐⭐⭐⭐⭐</div>
+                                            <span>(<?php echo rand(10, 50); ?>)</span>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <button class="related-nav related-next" id="related-next">❯</button>
                 </div>
             </div>
         </div>
@@ -2256,6 +2268,7 @@ get_header(); ?>
        transform: translateY(0);
    }
 }
+
 </style>
 
 <script>
