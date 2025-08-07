@@ -3028,4 +3028,5 @@ function phonestore_cart_fee_html($cart_fee_html, $fee) {
 }
 add_filter('woocommerce_cart_totals_fee_html', 'phonestore_cart_fee_html', 10, 2);
 
+
 ?>

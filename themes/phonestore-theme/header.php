@@ -24,7 +24,7 @@ Cập nhật header với navigation đầy đủ
             </h1>
         </div>
         
- <nav class="main-navigation">
+<nav class="main-navigation">
     <ul class="nav-menu">
         <li class="<?php echo (is_home() || is_front_page()) ? 'current-menu-item' : ''; ?>">
             <a href="<?php echo home_url(); ?>">🏠 Trang chủ</a>
@@ -41,52 +41,6 @@ Cập nhật header với navigation đầy đủ
                     echo home_url('/san-pham/');
                 }
             ?>">🛒 Sản phẩm</a>
-        </li>
-        
-        <li class="has-submenu <?php echo (is_product_category()) ? 'current-menu-item' : ''; ?>">
-            <a href="#">📱 Thương hiệu ▼</a>
-            <ul class="sub-menu">
-                <li><a href="<?php 
-                    $san_pham_page = get_page_by_path('san-pham');
-                    if ($san_pham_page) {
-                        echo get_permalink($san_pham_page->ID) . '?brand=iphone';
-                    } else {
-                        echo home_url('/san-pham/?brand=iphone');
-                    }
-                ?>">📱 iPhone</a></li>
-                <li><a href="<?php 
-                    $san_pham_page = get_page_by_path('san-pham');
-                    if ($san_pham_page) {
-                        echo get_permalink($san_pham_page->ID) . '?brand=samsung';
-                    } else {
-                        echo home_url('/san-pham/?brand=samsung');
-                    }
-                ?>">📱 Samsung</a></li>
-                <li><a href="<?php 
-                    $san_pham_page = get_page_by_path('san-pham');
-                    if ($san_pham_page) {
-                        echo get_permalink($san_pham_page->ID) . '?brand=xiaomi';
-                    } else {
-                        echo home_url('/san-pham/?brand=xiaomi');
-                    }
-                ?>">📱 Xiaomi</a></li>
-                <li><a href="<?php 
-                    $san_pham_page = get_page_by_path('san-pham');
-                    if ($san_pham_page) {
-                        echo get_permalink($san_pham_page->ID) . '?brand=oppo';
-                    } else {
-                        echo home_url('/san-pham/?brand=oppo');
-                    }
-                ?>">📱 OPPO</a></li>
-                <li><a href="<?php 
-                    $san_pham_page = get_page_by_path('san-pham');
-                    if ($san_pham_page) {
-                        echo get_permalink($san_pham_page->ID) . '?brand=vivo';
-                    } else {
-                        echo home_url('/san-pham/?brand=vivo');
-                    }
-                ?>">📱 Vivo</a></li>
-            </ul>
         </li>
         
         <li class="<?php echo (is_page('so-sanh-san-pham')) ? 'current-menu-item' : ''; ?>">
@@ -153,16 +107,13 @@ Cập nhật header với navigation đầy đủ
 </header>
 
 <style>
-/* === UPDATED HEADER STYLES === */
 .site-header {
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(20px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
-  padding: 20px 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  padding: 15px 0;
   position: sticky;
   top: 0;
   z-index: 1000;
-  border-bottom: 1px solid rgba(255,255,255,0.3);
 }
 
 .header-container {
@@ -174,22 +125,26 @@ Cập nhật header với navigation đầy đủ
   padding: 0 20px;
 }
 
+/* Logo/Site Title */
 .site-title a {
-  background: linear-gradient(135deg, #e53e3e 0%, #fd9644 50%, #38a169 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: white;
   text-decoration: none;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 900;
   letter-spacing: -0.5px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: all 0.3s ease;
 }
 
-/* Navigation */
+.site-title a:hover {
+  transform: scale(1.05);
+}
+
+/* Main Navigation */
 .main-navigation .nav-menu {
   display: flex;
   list-style: none;
-  gap: 8px;
+  gap: 5px;
   margin: 0;
   padding: 0;
 }
@@ -199,120 +154,91 @@ Cập nhật header với navigation đầy đủ
 }
 
 .nav-menu a {
-  color: #2d3748;
+  color: white;
   text-decoration: none;
-  padding: 12px 20px;
+  padding: 12px 18px;
   display: block;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-weight: 600;
-  font-size: 15px;
-  border-radius: 12px;
-  position: relative;
+  font-size: 14px;
+  border-radius: 25px;
+  white-space: nowrap;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.2);
 }
 
 .nav-menu a:hover,
 .nav-menu .current-menu-item a {
-  background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
-  color: white;
+  background: rgba(255,255,255,0.25);
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(56, 161, 105, 0.3);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+  border-color: rgba(255,255,255,0.4);
 }
 
-/* Dropdown menu */
-.nav-menu .sub-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  background: white;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-  min-width: 220px;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-10px);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  list-style: none;
-  padding: 15px 0;
-  margin: 0;
-  border-radius: 16px;
-  border: 1px solid rgba(0,0,0,0.06);
-}
-
-.nav-menu .has-submenu:hover .sub-menu {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-.sub-menu li a {
-  padding: 12px 25px;
-  font-size: 14px;
-  border-radius: 0;
-  margin: 0 10px;
-  border-radius: 8px;
-}
-
-.sub-menu li a:hover {
-  background: #f8fafc;
-  color: #38a169;
-  transform: translateX(5px);
-  box-shadow: none;
-}
-
-/* Header actions */
+/* Header Actions */
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 10px;
 }
 
 .cart-link, .account-link {
-  color: #2d3748;
+  color: white;
   text-decoration: none;
   padding: 10px 16px;
-  border-radius: 10px;
+  border-radius: 20px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.3s ease;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.2);
+  white-space: nowrap;
 }
 
 .cart-link:hover, .account-link:hover {
-  background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
-  color: white;
+  background: rgba(255,255,255,0.25);
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(56, 161, 105, 0.3);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
 }
 
 /* Mobile Menu Toggle */
 .mobile-menu-toggle {
   display: none;
   flex-direction: column;
-  background: none;
-  border: none;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.2);
   cursor: pointer;
   padding: 8px;
   gap: 4px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
 }
 
 .mobile-menu-toggle span {
-  width: 25px;
-  height: 3px;
-  background: #2d3748;
-  border-radius: 2px;
+  width: 22px;
+  height: 2px;
+  background: white;
+  border-radius: 1px;
   transition: all 0.3s ease;
 }
 
-.mobile-menu-toggle:hover span {
-  background: #38a169;
+.mobile-menu-toggle:hover {
+  background: rgba(255,255,255,0.25);
 }
 
 /* Mobile Navigation */
 .mobile-navigation {
   display: none;
-  background: white;
-  border-top: 1px solid #e2e8f0;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255,255,255,0.3);
   padding: 20px;
+  margin-top: 10px;
+  border-radius: 15px;
+  margin: 10px 20px 0;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
 }
 
 .mobile-nav-menu {
@@ -322,53 +248,25 @@ Cập nhật header với navigation đầy đủ
 }
 
 .mobile-nav-menu li {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .mobile-nav-menu a {
   display: block;
-  padding: 12px 0;
+  padding: 12px 15px;
   color: #2d3748;
   text-decoration: none;
   font-weight: 600;
-  font-size: 16px;
-  border-bottom: 1px solid #f1f5f9;
-  transition: color 0.3s ease;
+  font-size: 15px;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  background: rgba(103, 58, 183, 0.05);
 }
 
 .mobile-nav-menu a:hover {
-  color: #38a169;
-}
-
-.mobile-sub-menu {
-  list-style: none;
-  padding: 0;
-  margin: 10px 0 0 20px;
-  display: none;
-}
-
-.mobile-sub-menu li {
-  margin-bottom: 5px;
-}
-
-.mobile-sub-menu a {
-  font-size: 14px;
-  padding: 8px 0;
-  color: #4a5568;
-}
-
-.mobile-submenu.active .mobile-sub-menu {
-  display: block;
-}
-
-.submenu-toggle::after {
-  content: ' ▼';
-  font-size: 12px;
-  transition: transform 0.3s ease;
-}
-
-.mobile-submenu.active .submenu-toggle::after {
-  transform: rotate(180deg);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  transform: translateX(5px);
 }
 
 /* === RESPONSIVE === */
@@ -387,7 +285,8 @@ Cập nhật header với navigation đầy đủ
   
   .header-actions .cart-link,
   .header-actions .account-link {
-    display: none;
+    font-size: 12px;
+    padding: 8px 12px;
   }
   
   .header-container {
@@ -395,7 +294,7 @@ Cập nhật header với navigation đầy đủ
   }
   
   .site-title a {
-    font-size: 24px;
+    font-size: 20px;
   }
 }
 
@@ -405,13 +304,28 @@ Cập nhật header với navigation đầy đủ
   }
   
   .site-title a {
-    font-size: 20px;
+    font-size: 18px;
   }
   
-  .mobile-menu-toggle {
-    padding: 5px;
+  .header-actions .cart-link,
+  .header-actions .account-link {
+    display: none;
   }
 }
+
+/* Animation for mobile menu */
+.mobile-menu-toggle.active span:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+
+.mobile-menu-toggle.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.mobile-menu-toggle.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(5px, -5px);
+}
+
 </style>
 
 <script>
