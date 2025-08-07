@@ -1035,7 +1035,7 @@ function phonestore_handle_proceed_to_checkout() {
         
         // Send invoice email
         if (phonestore_send_invoice_email($billing_info, $cart, $invoice_number)) {
-            wc_add_notice('📧 Hóa đơn đã được gửi đến email của bạn. Vui lòng kiểm tra để xác nhận đơn hàng.', 'success');
+             wc_add_notice('📧 Hóa đơn đã được gửi đến email của bạn. Vui lòng kiểm tra để xác nhận đơn hàng.', 'success');
             
             // Store invoice info in session for checkout page
             WC()->session->set('pending_invoice', array(
@@ -3028,5 +3028,113 @@ function phonestore_cart_fee_html($cart_fee_html, $fee) {
 }
 add_filter('woocommerce_cart_totals_fee_html', 'phonestore_cart_fee_html', 10, 2);
 
+// Create checkout page if it doesn't exist
+function phonestore_create_checkout_page() {
+    // Check if checkout page exists
+    $checkout_page_id = wc_get_page_id('checkout');
+    
+    if ($checkout_page_id == -1 || !get_post($checkout_page_id)) {
+        // Create checkout page
+        $checkout_page = wp_insert_post(array(
+            'post_title' => 'Thanh Toán',
+            'post_name' => 'thanh-toan',
+            'post_content' => '[woocommerce_checkout]',
+            'post_status' => 'publish',
+            'post_type' => 'page',
+            'page_template' => 'page-checkout.php'
+        ));
+        
+        if ($checkout_page && !is_wp_error($checkout_page)) {
+            // Update WooCommerce settings
+            update_option('woocommerce_checkout_page_id', $checkout_page);
+        }
+    }
+}
+add_action('after_switch_theme', 'phonestore_create_checkout_page');
 
+// Customize checkout fields
+function phonestore_customize_checkout_fields($fields) {
+    // Billing fields
+    $fields['billing']['billing_first_name']['label'] = 'Họ *';
+    $fields['billing']['billing_last_name']['label'] = 'Tên *';
+    $fields['billing']['billing_email']['label'] = 'Email *';
+    $fields['billing']['billing_phone']['label'] = 'Số điện thoại *';
+    $fields['billing']['billing_address_1']['label'] = 'Địa chỉ *';
+    $fields['billing']['billing_city']['label'] = 'Thành phố *';
+    $fields['billing']['billing_postcode']['label'] = 'Mã bưu điện';
+    $fields['billing']['billing_country']['label'] = 'Quốc gia *';
+    $fields['billing']['billing_state']['label'] = 'Tỉnh/Thành phố *';
+    $fields['billing']['billing_company']['label'] = 'Tên công ty (tùy chọn)';
+    
+    // Shipping fields
+    if (isset($fields['shipping'])) {
+        $fields['shipping']['shipping_first_name']['label'] = 'Họ *';
+        $fields['shipping']['shipping_last_name']['label'] = 'Tên *';
+        $fields['shipping']['shipping_address_1']['label'] = 'Địa chỉ giao hàng *';
+        $fields['shipping']['shipping_city']['label'] = 'Thành phố *';
+        $fields['shipping']['shipping_postcode']['label'] = 'Mã bưu điện';
+        $fields['shipping']['shipping_country']['label'] = 'Quốc gia *';
+        $fields['shipping']['shipping_state']['label'] = 'Tỉnh/Thành phố *';
+        $fields['shipping']['shipping_company']['label'] = 'Tên công ty (tùy chọn)';
+    }
+    
+    // Order notes
+    if (isset($fields['order']['order_comments'])) {
+        $fields['order']['order_comments']['label'] = 'Ghi chú đơn hàng (tùy chọn)';
+        $fields['order']['order_comments']['placeholder'] = 'Ghi chú về đơn hàng, ví dụ: ghi chú đặc biệt cho việc giao hàng.';
+    }
+    
+    return $fields;
+}
+add_filter('woocommerce_checkout_fields', 'phonestore_customize_checkout_fields');
+
+// Add custom checkout validation
+function phonestore_checkout_field_validation($fields, $errors) {
+    if (empty($_POST['billing_phone'])) {
+        $errors->add('billing_phone_error', 'Số điện thoại là bắt buộc.');
+    } elseif (!preg_match('/^[0-9\-\+\s\(\)]+$/', $_POST['billing_phone'])) {
+        $errors->add('billing_phone_error', 'Số điện thoại không hợp lệ.');
+    }
+}
+add_action('woocommerce_checkout_process', 'phonestore_checkout_field_validation');
+
+// Add checkout success message customization
+function phonestore_checkout_order_processed($order_id) {
+    // Custom actions after order is processed
+    $order = wc_get_order($order_id);
+    
+    if ($order) {
+        // Add custom note
+        $order->add_order_note('Đơn hàng được tạo từ PhoneStore Theme');
+        
+        // Custom email notification can be added here
+    }
+}
+add_action('woocommerce_checkout_order_processed', 'phonestore_checkout_order_processed');
+
+// Customize order button text
+function phonestore_order_button_text($button_text) {
+    return 'Hoàn Tất Đặt Hàng';
+}
+add_filter('woocommerce_order_button_text', 'phonestore_order_button_text');
+
+// Add checkout page to WooCommerce endpoints
+function phonestore_add_checkout_endpoint() {
+    add_rewrite_endpoint('checkout', EP_ROOT | EP_PAGES);
+}
+add_action('init', 'phonestore_add_checkout_endpoint');
+
+// Handle checkout page redirect
+function phonestore_checkout_redirect() {
+    global $woocommerce;
+    
+    if (is_admin()) return;
+    
+    // Redirect to cart if trying to checkout with empty cart
+    if (is_page(wc_get_page_id('checkout')) && WC()->cart->is_empty() && !isset($_GET['order-received'])) {
+        wp_redirect(wc_get_page_permalink('cart'));
+        exit;
+    }
+}
+add_action('template_redirect', 'phonestore_checkout_redirect');
 ?>

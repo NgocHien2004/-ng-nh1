@@ -304,3 +304,68 @@ Version: 1.0
     height: 140px;
   }
 }
+
+/* Checkout Page Additional Styles */
+.woocommerce-checkout .blockOverlay {
+  background: rgba(255, 255, 255, 0.8) !important;
+}
+
+.woocommerce-checkout .blockOverlay:before {
+  content: "⏳ Đang xử lý đơn hàng...";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  font-weight: 600;
+  color: #667eea;
+}
+
+/* Checkout Success Styles */
+.woocommerce-order-received {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.woocommerce-order-received h1 {
+  color: #10b981;
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+}
+
+.woocommerce-thankyou-order-received {
+  background: #d1fae5;
+  color: #065f46;
+  padding: 20px;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 30px 0;
+}
+
+/* Mobile Checkout Improvements */
+@media (max-width: 480px) {
+  .checkout-page-container {
+    padding: 10px;
+  }
+
+  .checkout-header {
+    padding: 15px;
+    margin-bottom: 20px;
+  }
+
+  .checkout-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .checkout-billing-section,
+  .checkout-order-section {
+    padding: 15px;
+  }
+
+  .woocommerce-checkout .form-row input,
+  .woocommerce-checkout .form-row select {
+    padding: 10px 12px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+}
