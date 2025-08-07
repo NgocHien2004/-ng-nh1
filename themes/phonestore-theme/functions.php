@@ -2702,4 +2702,89 @@ function phonestore_wrap_shop_buttons_end() {
     echo '</div>';
 }
 add_action('woocommerce_after_shop_loop_item', 'phonestore_wrap_shop_buttons_end', 20);
+
+// Helper function để tạo product attributes nhanh
+function phonestore_create_product_attributes() {
+    // Tạo các taxonomy attributes cho WooCommerce
+    $attributes = array(
+        'pa_brand' => 'Thương hiệu',
+        'pa_screen_size' => 'Kích thước màn hình',
+        'pa_processor' => 'Vi xử lý',
+        'pa_ram' => 'RAM',
+        'pa_storage' => 'Bộ nhớ trong',
+        'pa_camera' => 'Camera',
+        'pa_battery' => 'Pin',
+        'pa_os' => 'Hệ điều hành'
+    );
+    
+    foreach ($attributes as $slug => $label) {
+        if (!taxonomy_exists($slug)) {
+            wc_create_attribute(array(
+                'name' => $label,
+                'slug' => $slug,
+                'type' => 'select',
+                'order_by' => 'menu_order',
+                'has_archives' => false,
+            ));
+        }
+    }
+}
+add_action('init', 'phonestore_create_product_attributes');
+
+// Debug function để kiểm tra attributes của product
+function phonestore_debug_product_attributes($product_id = null) {
+    if (!$product_id) {
+        global $post;
+        $product_id = $post->ID;
+    }
+    
+    $product = wc_get_product($product_id);
+    if (!$product) return;
+    
+    echo '<pre style="background:#f0f0f0;padding:10px;margin:10px 0;border-left:5px solid #0073aa;">';
+    echo '<strong>Product Attributes Debug for Product ID: ' . $product_id . '</strong><br>';
+    
+    // WooCommerce attributes
+    $attributes = $product->get_attributes();
+    echo '<strong>WooCommerce Attributes:</strong><br>';
+    if (empty($attributes)) {
+        echo '- No WooCommerce attributes found<br>';
+    } else {
+        foreach ($attributes as $attribute) {
+            $attribute_name = $attribute->get_name();
+            $attribute_label = wc_attribute_label($attribute_name);
+            
+            if ($attribute->is_taxonomy()) {
+                $values = wc_get_product_terms($product_id, $attribute_name, array('fields' => 'names'));
+                $attribute_value = implode(', ', $values);
+            } else {
+                $attribute_value = $attribute->get_options();
+                if (is_array($attribute_value)) {
+                    $attribute_value = implode(', ', $attribute_value);
+                }
+            }
+            
+            echo '- ' . $attribute_label . ': ' . $attribute_value . '<br>';
+        }
+    }
+    
+    // Custom meta fields
+    echo '<br><strong>Custom Meta Fields:</strong><br>';
+    $meta_keys = array('brand', 'display_size', 'cpu', 'ram', 'storage', 'rear_camera', 'battery', 'os');
+    foreach ($meta_keys as $key) {
+        $value = get_post_meta($product_id, $key, true);
+        echo '- ' . $key . ': ' . ($value ? $value : 'Not set') . '<br>';
+    }
+    
+    echo '</pre>';
+}
+
+// Hiển thị debug info cho admin
+function phonestore_show_debug_info() {
+    if (is_product() && current_user_can('administrator') && isset($_GET['debug'])) {
+        global $post;
+        phonestore_debug_product_attributes($post->ID);
+    }
+}
+add_action('wp_footer', 'phonestore_show_debug_info');
 ?>

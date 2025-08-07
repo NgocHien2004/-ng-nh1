@@ -89,39 +89,101 @@ get_header(); ?>
                     </div>
                     
                     <!-- Product Specs -->
-                    <div class="product-specs">
-                        <h3>📋 Thông số kỹ thuật</h3>
-                        <div class="specs-grid">
-                            <?php
-                            $specs = array(
-                                'brand' => '📱 Thương hiệu',
-                                'display_size' => '📺 Màn hình', 
-                                'cpu' => '⚡ Vi xử lý',
-                                'ram' => '💾 RAM',
-                                'storage' => '💿 Bộ nhớ trong',
-                                'rear_camera' => '📷 Camera sau',
-                                'front_camera' => '🤳 Camera trước',
-                                'battery' => '🔋 Pin',
-                                'os' => '🖥️ Hệ điều hành',
-                                'weight' => '⚖️ Trọng lượng',
-                                'dimensions' => '📏 Kích thước',
-                                'colors' => '🎨 Màu sắc'
-                            );
-                            
-                            foreach ($specs as $key => $label):
-                                $value = get_field($key, $product_id) ?: get_post_meta($product_id, $key, true);
-                                if ($value):
-                            ?>
-                                <div class="spec-item">
-                                    <span class="spec-label"><?php echo $label; ?>:</span>
-                                    <span class="spec-value"><?php echo esc_html($value); ?></span>
-                                </div>
-                            <?php 
-                                endif;
-                            endforeach; 
-                            ?>
-                        </div>
-                    </div>
+<div class="product-specs">
+    <h3>📋 Thông số kỹ thuật</h3>
+    <div class="specs-grid">
+        <?php
+        // Lấy WooCommerce attributes trước
+        $attributes = $product->get_attributes();
+        
+        if (!empty($attributes)) {
+            foreach ($attributes as $attribute) {
+                if ($attribute->get_variation()) {
+                    continue; // Skip variation attributes
+                }
+                
+                $attribute_name = $attribute->get_name();
+                $attribute_label = wc_attribute_label($attribute_name);
+                
+                if ($attribute->is_taxonomy()) {
+                    $values = wc_get_product_terms($product_id, $attribute_name, array('fields' => 'names'));
+                    $attribute_value = implode(', ', $values);
+                } else {
+                    $attribute_value = $attribute->get_options();
+                    if (is_array($attribute_value)) {
+                        $attribute_value = implode(', ', $attribute_value);
+                    }
+                }
+                
+                if (!empty($attribute_value)) {
+                    echo '<div class="spec-item">';
+                    echo '<span class="spec-label">' . esc_html($attribute_label) . ':</span>';
+                    echo '<span class="spec-value">' . esc_html($attribute_value) . '</span>';
+                    echo '</div>';
+                }
+            }
+        }
+        
+        // Fallback: Sử dụng ACF hoặc custom meta fields nếu có
+        $specs = array(
+            'brand' => '📱 Thương hiệu',
+            'display_size' => '📺 Màn hình', 
+            'cpu' => '⚡ Vi xử lý',
+            'ram' => '💾 RAM',
+            'storage' => '💿 Bộ nhớ trong',
+            'rear_camera' => '📷 Camera sau',
+            'front_camera' => '🤳 Camera trước',
+            'battery' => '🔋 Pin',
+            'os' => '🖥️ Hệ điều hành',
+            'weight' => '⚖️ Trọng lượng',
+            'dimensions' => '📏 Kích thước',
+            'colors' => '🎨 Màu sắc'
+        );
+        
+        // Chỉ hiển thị specs từ ACF/meta nếu WC attributes trống
+        if (empty($attributes)) {
+            foreach ($specs as $key => $label) {
+                // Thử ACF trước
+                $value = function_exists('get_field') ? get_field($key, $product_id) : '';
+                
+                // Nếu không có ACF, thử custom meta
+                if (empty($value)) {
+                    $value = get_post_meta($product_id, $key, true);
+                }
+                
+                // Nếu vẫn không có, thử meta với prefix '_'
+                if (empty($value)) {
+                    $value = get_post_meta($product_id, '_' . $key, true);
+                }
+                
+                if (!empty($value)) {
+                    echo '<div class="spec-item">';
+                    echo '<span class="spec-label">' . esc_html($label) . ':</span>';
+                    echo '<span class="spec-value">' . esc_html($value) . '</span>';
+                    echo '</div>';
+                }
+            }
+        }
+        
+        // Nếu không có spec nào, hiển thị thông báo
+        if (empty($attributes) && !array_filter($specs, function($key) use ($product_id) {
+            $value = function_exists('get_field') ? get_field($key, $product_id) : '';
+            if (empty($value)) {
+                $value = get_post_meta($product_id, $key, true);
+            }
+            if (empty($value)) {
+                $value = get_post_meta($product_id, '_' . $key, true);
+            }
+            return !empty($value);
+        }, ARRAY_FILTER_USE_KEY)) {
+        ?>
+            <div class="spec-item">
+                <span class="spec-label">📋 Thông số:</span>
+                <span class="spec-value">Đang cập nhật thông tin chi tiết</span>
+            </div>
+        <?php } ?>
+    </div>
+</div>
                     
                     <!-- Product Actions -->
                     <div class="product-actions">
