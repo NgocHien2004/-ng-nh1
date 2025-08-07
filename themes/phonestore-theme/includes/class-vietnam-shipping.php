@@ -68,55 +68,36 @@ class Vietnam_Shipping_Calculator extends WC_Shipping_Method {
     }
     
     private function add_local_shipping_options($distance) {
-        // Giao hàng gần (0-30km)
-        if ($distance <= 10) {
-            $this->add_rate(array(
-                'id' => $this->get_rate_id() . '_free',
-                'label' => sprintf('🚚 Giao hàng miễn phí (%.1f km)', $distance),
-                'cost' => 0,
-                'meta_data' => array('delivery_time' => 'Trong ngày')
-            ));
-        } elseif ($distance <= 20) {
-            $this->add_rate(array(
-                'id' => $this->get_rate_id() . '_near',
-                'label' => sprintf('🚚 Giao hàng gần (%.1f km)', $distance),
-                'cost' => 15000,
-                'meta_data' => array('delivery_time' => 'Trong ngày')
-            ));
-        } elseif ($distance <= 30) {
-            $this->add_rate(array(
-                'id' => $this->get_rate_id() . '_medium',
-                'label' => sprintf('🚚 Giao hàng trung (%.1f km)', $distance),
-                'cost' => 25000,
-                'meta_data' => array('delivery_time' => '1-2 ngày')
-            ));
-        }
+    // Ship nội thành (0-10km) - MIỄN PHÍ
+    if ($distance <= 10) {
+        $this->add_rate(array(
+            'id' => $this->get_rate_id() . '_free',
+            'label' => sprintf('🚚 Ship nội thành (%.1f km) - MIỄN PHÍ', $distance),
+            'cost' => 0,
+            'meta_data' => array('delivery_time' => 'Trong ngày')
+        ));
     }
     
-    private function add_viettel_post_options($customer_state) {
-        $is_same_region = $this->is_same_region($customer_state);
-        
-        // Gói tiết kiệm
-        $economy_cost = $is_same_region ? 25000 : 35000;
-        $region_text = $is_same_region ? 'Cùng vùng' : 'Khác vùng';
-        
+    // Ship ngoài thành (10-30km) - 25,000đ
+    if ($distance > 10 && $distance <= 30) {
         $this->add_rate(array(
-            'id' => $this->get_rate_id() . '_economy',
-            'label' => "📦 Viettel Post Tiết Kiệm ({$region_text})",
-            'cost' => $economy_cost,
-            'meta_data' => array('delivery_time' => '3-5 ngày')
-        ));
-        
-        // Gói giao nhanh  
-        $express_cost = $is_same_region ? 40000 : 50000;
-        
-        $this->add_rate(array(
-            'id' => $this->get_rate_id() . '_express',
-            'label' => "⚡ Viettel Post Giao Nhanh ({$region_text})",
-            'cost' => $express_cost,
+            'id' => $this->get_rate_id() . '_medium',
+            'label' => sprintf('🚚 Ship ngoài thành (%.1f km)', $distance),
+            'cost' => 25000,
             'meta_data' => array('delivery_time' => '1-2 ngày')
         ));
     }
+}
+
+private function add_viettel_post_options($customer_state) {
+    // Ship khác vùng miền (>30km) - 45,000đ
+    $this->add_rate(array(
+        'id' => $this->get_rate_id() . '_far',
+        'label' => '🚚 Ship khác vùng miền (>30km)',
+        'cost' => 45000,
+        'meta_data' => array('delivery_time' => '3-5 ngày')
+    ));
+}
     
     private function is_same_region($customer_state) {
         $customer_state = strtolower($customer_state);

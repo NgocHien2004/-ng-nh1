@@ -3000,6 +3000,7 @@ add_action('woocommerce_shipping_init', 'phonestore_register_vietnam_shipping');
 add_filter('woocommerce_shipping_methods', 'phonestore_add_vietnam_shipping');
 
 // Add shipping fee to cart
+// Add shipping fee to cart
 function phonestore_add_shipping_fee() {
     if (is_admin() && !defined('DOING_AJAX')) return;
     
@@ -3210,4 +3211,138 @@ function phonestore_ensure_woocommerce_templates() {
     }
 }
 add_action( 'template_redirect', 'phonestore_ensure_woocommerce_templates', 5 );
+
+// Tự động tính phí ship khi thay đổi địa chỉ
+function phonestore_checkout_shipping_calculator() {
+    if (is_checkout()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Tính lại phí ship khi thay đổi địa chỉ
+            var addressFields = [
+                '#billing_address_1',
+                '#billing_city', 
+                '#billing_state',
+                '#shipping_address_1',
+                '#shipping_city',
+                '#shipping_state'
+            ];
+            
+            $.each(addressFields, function(index, field) {
+                $(document).on('change blur', field, function() {
+                    // Delay để user có thể gõ xong
+                    clearTimeout(window.shippingUpdateTimeout);
+                    window.shippingUpdateTimeout = setTimeout(function() {
+                        $('body').trigger('update_checkout');
+                    }, 1000);
+                });
+            });
+            
+            // Loading indicator khi tính phí ship
+            $(document).on('checkout_error', function() {
+                console.log('Đang tính phí ship...');
+            });
+        });
+        </script>
+        <?php
+    }
+}
+add_action('wp_footer', 'phonestore_checkout_shipping_calculator');
+
+// Autofill địa chỉ bằng OpenRouteService API
+function phonestore_address_autofill_script() {
+    if (is_checkout()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Autocomplete cho địa chỉ
+            function setupAddressAutocomplete(inputSelector, suggestionContainerSelector) {
+                let searchTimeout;
+                
+                $(document).on('input', inputSelector, function() {
+                    const query = $(this).val();
+                    const $suggestions = $(suggestionContainerSelector);
+                    
+                    if (query.length < 3) {
+                        $suggestions.hide();
+                        return;
+                    }
+                    
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(function() {
+                        // Call OpenRouteService Geocoding API
+                        $.ajax({
+                            url: 'https://api.openrouteservice.org/geocode/search',
+                            method: 'GET',
+                            data: {
+                                api_key: '<?php echo OPENROUTE_API_KEY; ?>',
+                                text: query + ', Việt Nam',
+                                size: 5,
+                                layers: 'address'
+                            },
+                            success: function(data) {
+                                if (data.features && data.features.length > 0) {
+                                    let html = '<ul class="address-suggestions">';
+                                    data.features.forEach(function(feature) {
+                                        html += '<li class="suggestion-item" data-address="' + 
+                                               feature.properties.label + '">' + 
+                                               feature.properties.label + '</li>';
+                                    });
+                                    html += '</ul>';
+                                    
+                                    $suggestions.html(html).show();
+                                }
+                            }
+                        });
+                    }, 300);
+                });
+                
+                // Chọn địa chỉ từ gợi ý
+                $(document).on('click', '.suggestion-item', function() {
+                    const address = $(this).data('address');
+                    $(inputSelector).val(address);
+                    $(suggestionContainerSelector).hide();
+                    
+                    // Trigger update checkout
+                    $('body').trigger('update_checkout');
+                });
+            }
+            
+            // Thêm container cho suggestions
+            if (!$('#address-suggestions').length) {
+                $('#billing_address_1').after('<div id="address-suggestions" style="position:relative;z-index:999;"></div>');
+            }
+            
+            // Setup autocomplete
+            setupAddressAutocomplete('#billing_address_1', '#address-suggestions');
+        });
+        </script>
+        
+        <style>
+        .address-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        .suggestion-item:hover {
+            background: #f5f5f5;
+        }
+        </style>
+        <?php
+    }
+}
+add_action('wp_footer', 'phonestore_address_autofill_script');
 ?>
