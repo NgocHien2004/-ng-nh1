@@ -28,160 +28,269 @@ get_header(); ?>
                 <span><?php the_title(); ?></span>
             </nav>
             
-            <div class="product-main">
-                <!-- Product Gallery -->
-                <div class="product-gallery">
-                    <div class="main-image-container">
-                        <div class="main-image">
-                            <?php
-                            $attachment_ids = $product->get_gallery_image_ids();
-                            $main_image = get_post_thumbnail_id();
-                            
-                            if ($main_image) {
-                                echo '<img id="main-product-image" src="' . wp_get_attachment_image_url($main_image, 'large') . '" alt="' . get_the_title() . '">';
-                            } else {
-                                echo '<img id="main-product-image" src="' . wc_placeholder_img_src('large') . '" alt="No Image">';
-                            }
-                            ?>
-                            
-                            <?php if (count($attachment_ids) > 0 || $main_image): ?>
-                            <button class="gallery-nav prev-btn" id="prev-image">❮</button>
-                            <button class="gallery-nav next-btn" id="next-image">❯</button>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <!-- Thumbnail Gallery -->
-                        <?php if (count($attachment_ids) > 0 || $main_image): ?>
-                        <div class="thumbnail-gallery">
-                            <?php if ($main_image): ?>
-                                <img class="thumbnail active" 
-                                     src="<?php echo wp_get_attachment_image_url($main_image, 'thumbnail'); ?>" 
-                                     data-large="<?php echo wp_get_attachment_image_url($main_image, 'large'); ?>"
-                                     alt="<?php echo get_the_title(); ?>">
-                            <?php endif; ?>
-                            
-                            <?php foreach ($attachment_ids as $attachment_id): ?>
-                                <img class="thumbnail" 
-                                     src="<?php echo wp_get_attachment_image_url($attachment_id, 'thumbnail'); ?>" 
-                                     data-large="<?php echo wp_get_attachment_image_url($attachment_id, 'large'); ?>"
-                                     alt="<?php echo get_the_title(); ?>">
-                            <?php endforeach; ?>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
+<div class="product-main">
+    <!-- Product Gallery -->
+    <div class="product-gallery">
+        <div class="main-image-container">
+            <div class="main-image">
+                <?php
+                $attachment_ids = $product->get_gallery_image_ids();
+                $main_image = get_post_thumbnail_id();
                 
-                <!-- Product Info -->
-                <div class="product-info">
-                    <h1 class="product-title"><?php the_title(); ?></h1>
-                    
-                    <div class="product-price">
-                        <?php echo $product->get_price_html(); ?>
-                    </div>
-                    
-                    <div class="product-rating">
-                        <div class="stars">⭐⭐⭐⭐⭐</div>
-                        <span class="review-count">(<?php echo rand(10, 100); ?> đánh giá)</span>
-                    </div>
-                    
-                    <div class="product-short-description">
-                        <?php echo apply_filters('woocommerce_short_description', $product->get_short_description()); ?>
-                    </div>
-                    
-                    <!-- Product Specs -->
-<div class="product-specs">
-    <h3>📋 Thông số kỹ thuật</h3>
-    <div class="specs-grid">
-        <?php
-        // Lấy WooCommerce attributes trước
-        $attributes = $product->get_attributes();
-        
-        if (!empty($attributes)) {
-            foreach ($attributes as $attribute) {
-                if ($attribute->get_variation()) {
-                    continue; // Skip variation attributes
-                }
-                
-                $attribute_name = $attribute->get_name();
-                $attribute_label = wc_attribute_label($attribute_name);
-                
-                if ($attribute->is_taxonomy()) {
-                    $values = wc_get_product_terms($product_id, $attribute_name, array('fields' => 'names'));
-                    $attribute_value = implode(', ', $values);
+                if ($main_image) {
+                    echo '<img id="main-product-image" src="' . wp_get_attachment_image_url($main_image, 'large') . '" alt="' . get_the_title() . '">';
                 } else {
-                    $attribute_value = $attribute->get_options();
-                    if (is_array($attribute_value)) {
-                        $attribute_value = implode(', ', $attribute_value);
+                    echo '<img id="main-product-image" src="' . wc_placeholder_img_src('large') . '" alt="No Image">';
+                }
+                ?>
+                
+                <?php if (count($attachment_ids) > 0 || $main_image): ?>
+                <button class="gallery-nav prev-btn" id="prev-image">❮</button>
+                <button class="gallery-nav next-btn" id="next-image">❯</button>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Thumbnail Gallery -->
+            <?php if (count($attachment_ids) > 0 || $main_image): ?>
+            <div class="thumbnail-gallery">
+                <?php if ($main_image): ?>
+                    <img class="thumbnail active" 
+                         src="<?php echo wp_get_attachment_image_url($main_image, 'thumbnail'); ?>" 
+                         data-large="<?php echo wp_get_attachment_image_url($main_image, 'large'); ?>"
+                         alt="<?php echo get_the_title(); ?>">
+                <?php endif; ?>
+                
+                <?php foreach ($attachment_ids as $attachment_id): ?>
+                    <img class="thumbnail" 
+                         src="<?php echo wp_get_attachment_image_url($attachment_id, 'thumbnail'); ?>" 
+                         data-large="<?php echo wp_get_attachment_image_url($attachment_id, 'large'); ?>"
+                         alt="<?php echo get_the_title(); ?>">
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+        
+        <!-- Product Actions - Moved here under gallery -->
+        <div class="product-actions">
+            <div class="quantity-selector">
+                <label>Số lượng:</label>
+                <div class="quantity-input">
+                    <button type="button" class="qty-btn minus">-</button>
+                    <input type="number" name="quantity" value="1" min="1" max="10">
+                    <button type="button" class="qty-btn plus">+</button>
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="add-to-cart-btn" data-product-id="<?php echo $product_id; ?>">
+                    🛒 Thêm vào giỏ hàng
+                </button>
+                <button class="buy-now-btn" data-product-id="<?php echo $product_id; ?>">
+                    ⚡ Mua ngay
+                </button>
+                <button class="compare-btn" data-product-id="<?php echo $product_id; ?>">
+                    ⚖️ So sánh
+                </button>
+                <button class="wishlist-btn" data-product-id="<?php echo $product_id; ?>">
+                    ❤️ Yêu thích
+                </button>
+            </div>
+        </div>
+        
+        <!-- Additional Info -->
+        <div class="additional-info">
+            <div class="info-item">
+                <span class="icon">🚚</span>
+                <div class="info-text">
+                    <strong>Miễn phí giao hàng</strong>
+                    <small>Giao hàng miễn phí trong nội thành</small>
+                </div>
+            </div>
+            <div class="info-item">
+                <span class="icon">🔄</span>
+                <div class="info-text">
+                    <strong>Đổi trả 7 ngày</strong>
+                    <small>Miễn phí đổi trả trong 7 ngày</small>
+                </div>
+            </div>
+            <div class="info-item">
+                <span class="icon">🛡️</span>
+                <div class="info-text">
+                    <strong>Bảo hành chính hãng</strong>
+                    <small><?php echo $product->is_virtual() ? 'Bảo hành phần mềm' : 'Bảo hành 12-24 tháng'; ?></small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Product Info - Right side -->
+    <div class="product-info">
+        <h1 class="product-title"><?php the_title(); ?></h1>
+        
+        <div class="product-price">
+            <?php echo $product->get_price_html(); ?>
+        </div>
+        
+        <div class="product-rating">
+            <div class="stars">⭐⭐⭐⭐⭐</div>
+            <span class="review-count">(<?php echo rand(10, 100); ?> đánh giá)</span>
+        </div>
+        
+        <div class="product-short-description">
+            <?php echo apply_filters('woocommerce_short_description', $product->get_short_description()); ?>
+        </div>
+        
+        <!-- Product Specs với nhóm attributes đầy đủ -->
+        <div class="product-specs">
+            <h3>📋 Thông số kỹ thuật</h3>
+            <div class="specs-container">
+                <?php
+                // Định nghĩa mapping từ attributes hiện tại sang nhóm
+                $attribute_mapping = array(
+                    // Thông tin cơ bản
+                    'brand' => array('group' => 'basic', 'label' => '🏷️ Thương hiệu'),
+                    'model' => array('group' => 'basic', 'label' => '📱 Dòng sản phẩm'),
+                    'launch_date' => array('group' => 'basic', 'label' => '📅 Thời điểm ra mắt'),
+                    'price_range' => array('group' => 'basic', 'label' => '💰 Khoảng giá'),
+                    'design' => array('group' => 'basic', 'label' => '🎨 Thiết kế'),
+                    
+                    // Màn hình
+                    'screen_size' => array('group' => 'display', 'label' => '📺 Kích thước màn hình'),
+                    'screen_resolution' => array('group' => 'display', 'label' => '🔍 Độ phân giải màn hình'),
+                    'screen_technology' => array('group' => 'display', 'label' => '💻 Công nghệ màn hình'),
+                    'brightness' => array('group' => 'display', 'label' => '☀️ Độ sáng tối đa'),
+                    'refresh_rate' => array('group' => 'display', 'label' => '🔄 Tần số quét'),
+                    'screen_material' => array('group' => 'display', 'label' => '🛡️ Mặt kính cảm ứng'),
+                    
+                    // Hiệu năng
+                    'cpu' => array('group' => 'performance', 'label' => '⚡ Chip xử lý (CPU)'),
+                    'gpu' => array('group' => 'performance', 'label' => '🎮 Chip đồ họa (GPU)'),
+                    'ram' => array('group' => 'performance', 'label' => '💾 RAM'),
+                    'storage' => array('group' => 'performance', 'label' => '💿 Bộ nhớ trong'),
+                    'os' => array('group' => 'performance', 'label' => '🖥️ Hệ điều hành'),
+                    
+                    // Camera
+                    'rear_camera' => array('group' => 'camera', 'label' => '📷 Camera sau'),
+                    'front_camera' => array('group' => 'camera', 'label' => '🤳 Camera trước'),
+                    'camera_features' => array('group' => 'camera', 'label' => '✨ Tính năng camera sau'),
+                    'front_camera_features' => array('group' => 'camera', 'label' => '🔧 Tính năng camera trước'),
+                    'video_recording' => array('group' => 'camera', 'label' => '🎬 Quay phim'),
+                    
+                    // Kết nối
+                    'network' => array('group' => 'connectivity', 'label' => '📶 Mạng di động'),
+                    'wifi' => array('group' => 'connectivity', 'label' => '📶 Wi-Fi'),
+                    'bluetooth' => array('group' => 'connectivity', 'label' => '🔗 Bluetooth'),
+                    'gps' => array('group' => 'connectivity', 'label' => '🗺️ GPS'),
+                    'nfc' => array('group' => 'connectivity', 'label' => '📱 NFC'),
+                    'sim' => array('group' => 'connectivity', 'label' => '📞 SIM'),
+                    'charging_port' => array('group' => 'connectivity', 'label' => '🔌 Cổng sạc'),
+                    'audio_jack' => array('group' => 'connectivity', 'label' => '🎧 Jack tai nghe'),
+                    
+                    // Pin & Sạc
+                    'battery_capacity' => array('group' => 'battery', 'label' => '🔋 Dung lượng pin'),
+                    'battery_type' => array('group' => 'battery', 'label' => '⚡ Loại pin'),
+                    'charging_power' => array('group' => 'battery', 'label' => '⚡ Công suất sạc'),
+                    'charging_tech' => array('group' => 'battery', 'label' => '🔌 Công nghệ pin'),
+                    
+                    // Thiết kế
+                    'dimensions' => array('group' => 'design', 'label' => '📏 Kích thước'),
+                    'material' => array('group' => 'design', 'label' => '🏗️ Chất liệu'),
+                    'water_resistance' => array('group' => 'design', 'label' => '💧 Kháng nước'),
+                    'colors' => array('group' => 'design', 'label' => '🎨 Màu sắc'),
+                    
+                    // Bảo mật
+                    'security_features' => array('group' => 'security', 'label' => '🔒 Bảo mật'),
+                    
+                    // Đa phương tiện
+                    'audio_formats' => array('group' => 'multimedia', 'label' => '🎵 Định dạng âm thanh'),
+                    'video_formats' => array('group' => 'multimedia', 'label' => '🎬 Định dạng video'),
+                    'special_features' => array('group' => 'multimedia', 'label' => '⭐ Tính năng đặc biệt')
+                );
+                
+                // Nhóm hiển thị
+                $display_groups = array(
+                    'basic' => '🏷️ Thông tin cơ bản',
+                    'display' => '📺 Màn hình', 
+                    'performance' => '⚡ Hiệu năng',
+                    'camera' => '📷 Camera',
+                    'connectivity' => '🌐 Kết nối',
+                    'battery' => '🔋 Pin & Sạc',
+                    'design' => '🎨 Thiết kế',
+                    'security' => '🔒 Bảo mật',
+                    'multimedia' => '🎵 Đa phương tiện'
+                );
+                
+                // Lấy tất cả attributes/meta fields
+                $all_specs = array();
+                
+                // Lấy WooCommerce attributes
+                $wc_attributes = $product->get_attributes();
+                foreach ($wc_attributes as $attribute) {
+                    $attribute_name = str_replace('pa_', '', $attribute->get_name());
+                    if ($attribute->is_taxonomy()) {
+                        $values = wc_get_product_terms($product_id, $attribute->get_name(), array('fields' => 'names'));
+                        $value = implode(', ', $values);
+                    } else {
+                        $value = $attribute->get_options();
+                        if (is_array($value)) {
+                            $value = implode(', ', $value);
+                        }
+                    }
+                    if (!empty($value)) {
+                        $all_specs[$attribute_name] = $value;
                     }
                 }
                 
-                if (!empty($attribute_value)) {
+                // Lấy custom meta fields
+                $meta_keys = get_post_meta($product_id);
+                foreach ($meta_keys as $key => $values) {
+                    if (strpos($key, '_') !== 0 && !empty($values[0])) {
+                        $all_specs[$key] = $values[0];
+                    }
+                }
+                
+                // Nhóm specs theo group
+                $grouped_specs = array();
+                foreach ($all_specs as $key => $value) {
+                    if (isset($attribute_mapping[$key])) {
+                        $group = $attribute_mapping[$key]['group'];
+                        $label = $attribute_mapping[$key]['label'];
+                        $grouped_specs[$group][] = array('label' => $label, 'value' => $value);
+                    }
+                }
+                
+                // Hiển thị từng nhóm
+                $has_any_specs = false;
+                foreach ($display_groups as $group_key => $group_title) {
+                    if (isset($grouped_specs[$group_key]) && !empty($grouped_specs[$group_key])) {
+                        $has_any_specs = true;
+                        echo '<div class="spec-group">';
+                        echo '<h4 class="spec-group-title">' . esc_html($group_title) . '</h4>';
+                        echo '<div class="spec-group-content">';
+                        
+                        foreach ($grouped_specs[$group_key] as $spec) {
+                            echo '<div class="spec-item">';
+                            echo '<span class="spec-label">' . esc_html($spec['label']) . ':</span>';
+                            echo '<span class="spec-value">' . esc_html($spec['value']) . '</span>';
+                            echo '</div>';
+                        }
+                        
+                        echo '</div></div>';
+                    }
+                }
+                
+                // Nếu không có specs, hiển thị thông báo
+                if (!$has_any_specs) {
+                    echo '<div class="spec-group">';
                     echo '<div class="spec-item">';
-                    echo '<span class="spec-label">' . esc_html($attribute_label) . ':</span>';
-                    echo '<span class="spec-value">' . esc_html($attribute_value) . '</span>';
+                    echo '<span class="spec-label">📋 Thông số:</span>';
+                    echo '<span class="spec-value">Đang cập nhật thông tin chi tiết</span>';
+                    echo '</div>';
                     echo '</div>';
                 }
-            }
-        }
-        
-        // Fallback: Sử dụng ACF hoặc custom meta fields nếu có
-        $specs = array(
-            'brand' => '📱 Thương hiệu',
-            'display_size' => '📺 Màn hình', 
-            'cpu' => '⚡ Vi xử lý',
-            'ram' => '💾 RAM',
-            'storage' => '💿 Bộ nhớ trong',
-            'rear_camera' => '📷 Camera sau',
-            'front_camera' => '🤳 Camera trước',
-            'battery' => '🔋 Pin',
-            'os' => '🖥️ Hệ điều hành',
-            'weight' => '⚖️ Trọng lượng',
-            'dimensions' => '📏 Kích thước',
-            'colors' => '🎨 Màu sắc'
-        );
-        
-        // Chỉ hiển thị specs từ ACF/meta nếu WC attributes trống
-        if (empty($attributes)) {
-            foreach ($specs as $key => $label) {
-                // Thử ACF trước
-                $value = function_exists('get_field') ? get_field($key, $product_id) : '';
-                
-                // Nếu không có ACF, thử custom meta
-                if (empty($value)) {
-                    $value = get_post_meta($product_id, $key, true);
-                }
-                
-                // Nếu vẫn không có, thử meta với prefix '_'
-                if (empty($value)) {
-                    $value = get_post_meta($product_id, '_' . $key, true);
-                }
-                
-                if (!empty($value)) {
-                    echo '<div class="spec-item">';
-                    echo '<span class="spec-label">' . esc_html($label) . ':</span>';
-                    echo '<span class="spec-value">' . esc_html($value) . '</span>';
-                    echo '</div>';
-                }
-            }
-        }
-        
-        // Nếu không có spec nào, hiển thị thông báo
-        if (empty($attributes) && !array_filter($specs, function($key) use ($product_id) {
-            $value = function_exists('get_field') ? get_field($key, $product_id) : '';
-            if (empty($value)) {
-                $value = get_post_meta($product_id, $key, true);
-            }
-            if (empty($value)) {
-                $value = get_post_meta($product_id, '_' . $key, true);
-            }
-            return !empty($value);
-        }, ARRAY_FILTER_USE_KEY)) {
-        ?>
-            <div class="spec-item">
-                <span class="spec-label">📋 Thông số:</span>
-                <span class="spec-value">Đang cập nhật thông tin chi tiết</span>
+                ?>
             </div>
-        <?php } ?>
+        </div>
     </div>
 </div>
                     
@@ -856,6 +965,354 @@ get_header(); ?>
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+/* Spec Groups */
+.specs-container {
+    display: grid;
+    gap: 25px;
+}
+
+.spec-group {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 20px;
+    border-left: 4px solid #667eea;
+}
+
+.spec-group-title {
+    color: #2d3748;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 15px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.spec-group-content {
+    display: grid;
+    gap: 10px;
+}
+
+.spec-item {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 15px;
+    padding: 8px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.spec-item:last-child {
+    border-bottom: none;
+}
+
+.spec-label {
+    font-weight: 600;
+    color: #4a5568;
+    font-size: 14px;
+}
+
+.spec-value {
+    color: #2d3748;
+    font-weight: 500;
+    font-size: 14px;
+    word-wrap: break-word;
+}
+
+/* Responsive cho spec groups */
+@media (max-width: 768px) {
+    .spec-item {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+    
+    .spec-label {
+        font-weight: 700;
+    }
+}
+
+/* Layout chính */
+.product-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 50px;
+    margin-bottom: 50px;
+}
+
+/* Gallery bên trái */
+.product-gallery {
+    position: sticky;
+    top: 100px;
+}
+
+/* Actions moved under gallery */
+.product-actions {
+    margin-top: 30px;
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.quantity-selector {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.quantity-selector label {
+    font-weight: 600;
+    color: #4a5568;
+    font-size: 16px;
+}
+
+.quantity-input {
+    display: flex;
+    align-items: center;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.qty-btn {
+    background: #f8fafc;
+    border: none;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+.qty-btn:hover {
+    background: #e2e8f0;
+}
+
+.quantity-input input {
+    width: 60px;
+    height: 40px;
+    text-align: center;
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.action-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.add-to-cart-btn,
+.buy-now-btn,
+.compare-btn,
+.wishlist-btn {
+    padding: 12px 16px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+}
+
+.add-to-cart-btn {
+    background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(56, 161, 105, 0.3);
+}
+
+.add-to-cart-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(56, 161, 105, 0.4);
+}
+
+.buy-now-btn {
+    background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(229, 62, 62, 0.3);
+}
+
+.buy-now-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(229, 62, 62, 0.4);
+}
+
+.compare-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.compare-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.wishlist-btn {
+    background: linear-gradient(135deg, #ed64a6 0%, #d53f8c 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(237, 100, 166, 0.3);
+}
+
+.wishlist-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(237, 100, 166, 0.4);
+}
+
+/* Additional Info under actions */
+.additional-info {
+    margin-top: 20px;
+    display: grid;
+    gap: 12px;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border-left: 4px solid #38a169;
+}
+
+.info-item .icon {
+    font-size: 20px;
+    min-width: 24px;
+}
+
+.info-text strong {
+    display: block;
+    color: #2d3748;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
+.info-text small {
+    color: #718096;
+    font-size: 12px;
+}
+
+/* Product Info bên phải */
+.product-info {
+    background: white;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+/* Spec Groups */
+.specs-container {
+    display: grid;
+    gap: 20px;
+    max-height: 600px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.specs-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.specs-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.specs-container::-webkit-scrollbar-thumb {
+    background: #667eea;
+    border-radius: 3px;
+}
+
+.spec-group {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 16px;
+    border-left: 4px solid #667eea;
+}
+
+.spec-group-title {
+    color: #2d3748;
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.spec-group-content {
+    display: grid;
+    gap: 8px;
+}
+
+.spec-item {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid #e2e8f0;
+    align-items: start;
+}
+
+.spec-item:last-child {
+    border-bottom: none;
+}
+
+.spec-label {
+    font-weight: 600;
+    color: #4a5568;
+    font-size: 13px;
+}
+
+.spec-value {
+    color: #2d3748;
+    font-weight: 500;
+    font-size: 13px;
+    word-wrap: break-word;
+    line-height: 1.4;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .product-main {
+        grid-template-columns: 1fr;
+        gap: 30px;
+    }
+    
+    .product-gallery {
+        position: static;
+    }
+}
+
+@media (max-width: 768px) {
+    .action-buttons {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .quantity-selector {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .spec-item {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+    
+    .specs-container {
+        max-height: 400px;
     }
 }
 </style>

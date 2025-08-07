@@ -2787,4 +2787,6 @@ function phonestore_show_debug_info() {
     }
 }
 add_action('wp_footer', 'phonestore_show_debug_info');
+
+
 ?>
