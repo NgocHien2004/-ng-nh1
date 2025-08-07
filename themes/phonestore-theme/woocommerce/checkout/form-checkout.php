@@ -81,13 +81,13 @@ if ( ! $checkout->is_registration_enabled() && $checkout->is_registration_requir
 }
 
 .checkout-header {
-	text-align: center;
-	margin-bottom: 40px;
-	padding: 30px;
-	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-	color: white;
-	border-radius: 15px;
-	box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 30px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white; /* Sửa lỗi này */
+    border-radius: 15px;
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
 }
 
 .checkout-header h1 {

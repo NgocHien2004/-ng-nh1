@@ -905,11 +905,12 @@ add_action('wp_ajax_phonestore_update_cart', 'phonestore_ajax_update_cart');
 add_action('wp_ajax_nopriv_phonestore_update_cart', 'phonestore_ajax_update_cart');
 
 // Improve cart notices
-function phonestore_improve_cart_notices($message, $notice_type) {
-    if (is_cart()) {
+// Sửa function improve cart notices
+function phonestore_improve_cart_notices($message, $notice_type = 'notice') {
+    if (is_cart() || is_checkout()) {
         $icons = array(
             'success' => '✅',
-            'error' => '❌',
+            'error' => '❌', 
             'notice' => 'ℹ️'
         );
         
@@ -918,6 +919,7 @@ function phonestore_improve_cart_notices($message, $notice_type) {
     }
     return $message;
 }
+add_filter('woocommerce_add_message', 'phonestore_improve_cart_notices', 10, 2);
 add_filter('woocommerce_add_success_notice', 'phonestore_improve_cart_notices', 10, 2);
 add_filter('woocommerce_add_error_notice', 'phonestore_improve_cart_notices', 10, 2);
 add_filter('woocommerce_add_notice', 'phonestore_improve_cart_notices', 10, 2);
@@ -3089,14 +3091,14 @@ function phonestore_customize_checkout_fields($fields) {
 add_filter('woocommerce_checkout_fields', 'phonestore_customize_checkout_fields');
 
 // Add custom checkout validation
-function phonestore_checkout_field_validation($fields, $errors) {
+function phonestore_checkout_field_validation() {
     if (empty($_POST['billing_phone'])) {
-        $errors->add('billing_phone_error', 'Số điện thoại là bắt buộc.');
+        wc_add_notice('Số điện thoại là bắt buộc.', 'error');
     } elseif (!preg_match('/^[0-9\-\+\s\(\)]+$/', $_POST['billing_phone'])) {
-        $errors->add('billing_phone_error', 'Số điện thoại không hợp lệ.');
+        wc_add_notice('Số điện thoại không hợp lệ.', 'error');
     }
 }
-add_action('woocommerce_checkout_process', 'phonestore_checkout_field_validation');
+add_action('woocommerce_checkout_process', 'phonestore_checkout_field_validation', 10, 0);
 
 // Add checkout success message customization
 function phonestore_checkout_order_processed($order_id) {
@@ -3137,4 +3139,31 @@ function phonestore_checkout_redirect() {
     }
 }
 add_action('template_redirect', 'phonestore_checkout_redirect');
+
+// Thay vì gọi apply_filters trực tiếp, sử dung WooCommerce function:
+function phonestore_cart_coupon_html($coupon_html, $coupon, $discount_amount_html) {
+    if ($coupon && is_object($coupon)) {
+        return $coupon_html;
+    }
+    return $coupon_html;
+}
+add_filter('woocommerce_cart_totals_coupon_html', 'phonestore_cart_coupon_html', 10, 3);
+
+// Fix WooCommerce checkout errors
+function phonestore_fix_checkout_errors() {
+    if (is_admin()) return;
+    
+    // Ensure WooCommerce is loaded
+    if (!function_exists('WC')) return;
+    
+    // Fix cart calculations
+    if (WC()->cart) {
+        WC()->cart->calculate_totals();
+    }
+}
+add_action('wp_loaded', 'phonestore_fix_checkout_errors');
+
+// Remove problematic hooks that cause argument count errors
+remove_all_actions('woocommerce_checkout_process');
+add_action('woocommerce_checkout_process', 'phonestore_checkout_field_validation');
 ?>
